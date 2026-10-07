@@ -1,0 +1,25 @@
+<%- include('_head') %>
+<div class="page-head"><h1><a href="/admin/keep?tab=members" class="muted" style="text-decoration:none">←</a> 킵 보관 목록</h1></div>
+<section class="card" style="margin-bottom:14px">
+  <div class="nick" style="font-size:30px"><%= u.youtube_nickname %></div>
+  <div class="muted"><%= u.name %> · <%= fmt.phone(u.phone) %> · <a href="/admin/users/<%= u.id %>">회원 정보</a></div>
+  <dl class="kv" style="margin-top:12px">
+    <dt>보관 금액</dt><dd class="num" style="font-size:18px"><%= fmt.won(box.keptAmount) %></dd>
+    <dt>보관 주문</dt><dd><%= box.orders.length %>건</dd>
+    <dt>지금 출고 시</dt><dd><%= box.orders.length ? (box.fee ? '배송비 ' + fmt.won(box.fee) + ' (무료까지 ' + fmt.won(box.remaining) + ')' : '무료배송') : '-' %></dd>
+  </dl>
+</section>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>주문번호</th><th>상품</th><th class="right">상품금액</th><th>결제</th><th>결제일시</th></tr></thead>
+    <tbody>
+    <% if (!box.orders.length) { %><tr><td colspan="5" class="empty">보관 중인 주문이 없어요</td></tr><% } %>
+    <% box.orders.forEach(function (o) { %>
+      <tr class="row"><td><a href="/admin/orders/<%= o.id %>" class="num"><%= o.order_no %></a></td>
+        <td class="items"><% o.items.forEach(function (it) { %><div><%= it.product_name %> ×<%= it.qty %><% if (it.qty_opened || it.qty_unopened) { %> <span class="opt">(<%= fmt.optText(it) %>)</span><% } %></div><% }) %></td>
+        <td class="right num amount"><%= fmt.won(o.items_amount) %></td><td><span class="chip <%= o.payment_method %>"><%= L.payment[o.payment_method] %></span></td><td class="num muted"><%= fmt.dt(o.paid_at) %></td></tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<%- include('_foot') %>

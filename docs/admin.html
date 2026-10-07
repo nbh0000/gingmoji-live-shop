@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141011">
+<meta name="robots" content="noindex">
+<title>대시보드 · 깅모지 관리자</title>
+<link rel="icon" href="static/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="static/css/admin.css">
+<meta name="csrf" content="tzytsDLk7T8Cgn3jwr73ZsfB">
+<script src="static/js/demo-data.js"></script>
+<script src="static/js/demo-map.js"></script>
+<script src="static/js/demo.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="logo" href="admin.html"><span class="g">깅</span>모지<small>ADMIN</small></a>
+    <nav class="nav">
+      
+      <a href="admin.html" class="on"><span><span class="dot on"></span>대시보드</span></a>
+      <a href="admin-orders.html" class=""><span>주문 관리</span><span class="cnt" title="입금 대기">1</span></a>
+      <a href="admin-keep.html" class=""><span>킵 관리</span></a>
+      <a href="admin-products.html" class=""><span>상품·재고</span></a>
+      <a href="admin-users.html" class=""><span>회원</span></a>
+      <a href="admin-settings.html" class=""><span>설정</span></a>
+      <a href="admin-pages.html" class=""><span>약관·정책</span></a>
+    </nav>
+    <div class="side-foot">
+      <a href="index.html" target="_blank">고객 화면 열기 ↗</a>
+      <form method="post" action="#" data-orig-action="/admin/logout"><input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB"><button class="btn sm ghost" type="submit">로그아웃</button></form>
+    </div>
+  </aside>
+  <main class="main">
+  
+
+<div class="page-head"><h1>대시보드</h1><span class="muted num" data-clock></span></div>
+
+<section class="live-switch">
+  <div>
+    <div class="state on"><span class="dot on"></span>방송 중 · 주문 받는 중</div>
+    <div class="desc">고객 화면에 가격이 보이고 주문할 수 있어요</div>
+  </div>
+  <form method="post" action="#" data-orig-action="/admin/live">
+    <input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB">
+    <input type="hidden" name="on" value="0">
+    <button class="big-toggle stop" type="submit">방송 종료</button>
+  </form>
+</section>
+
+<div class="stats" data-stats>
+  <a class="stat" href="admin-orders.html"><span class="k">오늘 주문</span><span class="v num" data-st="todayOrders">6</span><span class="s">취소 제외</span></a>
+  <a class="stat" href="admin-orders.html"><span class="k">오늘 결제 매출</span><span class="v num" data-st="todayRevenue">202,000원</span><span class="s"><span data-st="todayPaid">5</span>건 결제완료</span></a>
+  <a class="stat alert" href="admin-orders.html"><span class="k">입금 대기</span><span class="v num" data-st="bankPending">1</span><span class="s num" data-st="bankPendingAmount">95,000원</span></a>
+  <a class="stat " href="admin-keep.html"><span class="k">킵 출고 요청</span><span class="v num" data-st="shipRequests">0</span><span class="s">배송 준비할 바로배송 <span data-st="toPrepare">2</span>건</span></a>
+</div>
+
+<div class="two">
+  <section class="card">
+    <h2>최근 주문 <span class="muted" style="font-size:12px;font-weight:500">10초마다 자동 갱신</span></h2>
+    <div class="table-wrap" style="box-shadow:none">
+      <table>
+        <thead><tr><th>닉네임</th><th class="right">금액</th><th>상태</th><th>시각</th></tr></thead>
+        <tbody data-recent>
+        
+          <tr><td><a class="nick" style="font-size:18px" href="admin-order.html">깅모지러버</a><span class="nick-sub">김시청 · 바로배송 · 계좌이체</span></td>
+          <td class="right num amount">95,000원</td><td><span class="chip pending">입금대기</span></td><td class="num muted nowrap">14:34</td></tr>
+        
+          <tr><td><a class="nick" style="font-size:18px" href="admin-order.html">깅모지러버</a><span class="nick-sub">김시청 · 킵 · 계좌이체</span></td>
+          <td class="right num amount">24,000원</td><td><span class="chip kept">킵보관</span></td><td class="num muted nowrap">14:34</td></tr>
+        
+          <tr><td><a class="nick" style="font-size:18px" href="admin-order.html">깅모지러버</a><span class="nick-sub">김시청 · 킵 · 계좌이체</span></td>
+          <td class="right num amount">30,000원</td><td><span class="chip kept">킵보관</span></td><td class="num muted nowrap">14:34</td></tr>
+        
+          <tr><td><a class="nick" style="font-size:18px" href="admin-order.html">깅모지러버</a><span class="nick-sub">김시청 · 바로배송 · 계좌이체</span></td>
+          <td class="right num amount">34,000원</td><td><span class="chip paid">결제완료</span></td><td class="num muted nowrap">11:30</td></tr>
+        
+          <tr><td><a class="nick" style="font-size:18px" href="admin-order.html">깅모지러버</a><span class="nick-sub">김시청 · 바로배송 · 계좌이체</span></td>
+          <td class="right num amount">16,000원</td><td><span class="chip cancelled">취소</span></td><td class="num muted nowrap">11:28</td></tr>
+        
+          <tr><td><a class="nick" style="font-size:18px" href="admin-order.html">깅모지러버</a><span class="nick-sub">김시청 · 킵 · 계좌이체</span></td>
+          <td class="right num amount">36,000원</td><td><span class="chip shipped">발송완료</span></td><td class="num muted nowrap">11:28</td></tr>
+        
+          <tr><td><a class="nick" style="font-size:18px" href="admin-order.html">깅모지러버</a><span class="nick-sub">김시청 · 바로배송 · 계좌이체</span></td>
+          <td class="right num amount">78,000원</td><td><span class="chip paid">결제완료</span></td><td class="num muted nowrap">11:28</td></tr>
+        
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="card">
+    <h2>빠른 설정</h2>
+    <form method="post" action="#" data-orig-action="/admin/price-always" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+      <input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB">
+      <input type="hidden" name="on" value="1">
+      <div><b>가격 항상 노출</b><div class="muted" style="font-size:12.5px">PG 심사 기간용. 방송과 무관하게 가격만 보여요 (주문은 방송 중에만)</div></div>
+      <button class="btn sm ghost" type="submit">꺼짐</button>
+    </form>
+    <dl class="kv" style="margin-top:12px">
+      <dt>입금 계좌</dt><dd>케이뱅크 100301443318 (김민정(깅모지))</dd>
+      <dt>배송비</dt><dd>80,000원 이상 무료 / 미만 4,000원</dd>
+      <dt>카드 결제 대기</dt><dd>10분 후 자동 취소</dd>
+      <dt>계좌 입금 기한</dt><dd>24시간 후 자동 취소</dd>
+      <dt>포인트 적립</dt><dd>3% (계좌이체만)</dd>
+      <dt>카드결제</dt><dd>포트원 키 미설정 → 계좌이체만</dd>
+    </dl>
+    <a class="btn sm ghost" href="admin-settings.html" style="margin-top:12px">설정 변경</a>
+  </section>
+</div>
+<script>window.ADMIN_DASH = true;</script>
+  </main>
+</div>
+<script src="static/js/admin.js"></script>
+</body>
+</html>
+

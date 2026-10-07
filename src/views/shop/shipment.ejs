@@ -1,0 +1,43 @@
+<%- include('../partials/head', { title: '출고 요청', bodyClass: '' }) %>
+<% var lbl = ({ pending_payment: sr.payment_method === 'bank' ? '배송비 입금대기' : '배송비 결제대기', requested: '출고 요청 완료', preparing: '배송준비', shipped: '발송완료', cancelled: '취소' })[sr.status]; %>
+<main class="wrap page">
+  <div class="page-title"><a class="back" href="/my/keep" aria-label="뒤로">←</a>출고 요청</div>
+
+  <% if (sr.status === 'pending_payment' && sr.payment_method === 'bank') { %>
+  <section class="bank-card" style="margin-bottom:14px">
+    <div class="row"><span class="k">입금하실 배송비</span><button class="copy" type="button" data-copy="<%= sr.shipping_fee %>">금액 복사</button></div>
+    <div class="amount num"><%= fmt.won(sr.shipping_fee) %></div>
+    <div class="row"><div><div class="k">입금 계좌</div><div class="v num"><%= s.bank_name %> <%= s.bank_account %></div></div><button class="copy" type="button" data-copy="<%= s.bank_account %>">계좌 복사</button></div>
+    <div class="row"><div><div class="k">예금주</div><div class="v"><%= s.bank_holder %></div></div></div>
+    <div class="row"><div><div class="k">입금자명</div><div class="v"><%= sr.depositor_name %></div></div></div>
+    <div class="k">입금이 확인되면 출고 요청이 접수돼요.</div>
+  </section>
+  <% } %>
+  <% if (sr.status === 'pending_payment' && sr.payment_method === 'card') { %>
+  <section class="panel tint">
+    <h2>배송비 카드결제를 완료해 주세요</h2>
+    <button class="btn big block pink" type="button" data-repay="<%= sr.request_no %>" data-kind="shipment">카드로 <%= fmt.won(sr.shipping_fee) %> 결제하기</button>
+  </section>
+  <% } %>
+
+  <section class="panel">
+    <h2><span>요청 정보</span><span class="chip <%= sr.status === 'cancelled' ? 'gray' : (sr.status === 'pending_payment' ? 'warn' : 'ok') %>"><%= lbl %></span></h2>
+    <dl class="kv">
+      <dt>요청번호</dt><dd class="num"><%= sr.request_no %></dd>
+      <dt>요청일시</dt><dd class="num"><%= fmt.dt(sr.created_at) %></dd>
+      <dt>보관 상품금액</dt><dd class="num"><%= fmt.won(sr.kept_amount) %></dd>
+      <dt>배송비</dt><dd class="num"><%= sr.shipping_fee ? fmt.won(sr.shipping_fee) : '무료' %></dd>
+      <% if (sr.tracking_no) { %><dt>송장</dt><dd><%= sr.courier %> <%= sr.tracking_no %></dd><% } %>
+    </dl>
+  </section>
+  <section class="panel">
+    <h2>포함된 주문 <span class="side" style="color:var(--muted)"><%= list.length %>건</span></h2>
+    <% list.forEach(function (o) { %><div class="sum-row"><a class="link num" href="/orders/<%= o.order_no %>"><%= o.order_no %></a><span class="num"><%= fmt.won(o.items_amount) %></span></div><% }) %>
+  </section>
+  <section class="panel">
+    <h2>받는 분</h2>
+    <div class="addr-view"><div class="who"><%= sr.recipient_name %> · <%= fmt.phone(sr.recipient_phone) %></div><div><%= sr.address1 %> <%= sr.address2 %></div><% if (sr.memo) { %><div class="muted">메모: <%= sr.memo %></div><% } %></div>
+  </section>
+  <% if (sr.status === 'pending_payment') { %><button class="btn block ghost" type="button" data-cancel-shipment="<%= sr.request_no %>">출고 요청 취소</button><% } %>
+</main>
+<%- include('../partials/foot', { scripts: (sr.status === 'pending_payment' && sr.payment_method === 'card') ? ['https://cdn.portone.io/v2/browser-sdk.js', '/static/js/pay.js?v=1'] : ['/static/js/pay.js?v=1'] }) %>

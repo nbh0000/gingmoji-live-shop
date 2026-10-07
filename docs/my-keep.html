@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#141011">
+<title>킵 보관함 · 깅모지 LIVE</title>
+<meta name="description" content="깅모지 유튜브 라이브 방송 전용 주문 사이트">
+<meta property="og:title" content="깅모지 LIVE 주문">
+<meta property="og:image" content="/static/img/logo-wide.jpg">
+<link rel="icon" href="static/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="static/css/shop.css">
+<meta name="csrf" content="kaApRQFrtluwfwpn9cQ_4-kX">
+<script src="static/js/demo-data.js"></script>
+<script src="static/js/demo-map.js"></script>
+<script src="static/js/demo.js"></script>
+</head>
+<body class="">
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="index.html" aria-label="깅모지 홈"><span class="g">깅</span>모지<span class="q">?</span></a>
+    <div class="top-actions">
+      <span class="live-pill on" data-live-pill>LIVE</span>
+      <a class="icon-btn" href="my.html" aria-label="마이페이지">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2"/></svg>
+      </a>
+      <button class="icon-btn" type="button" data-open-cart aria-label="장바구니">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 10.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>
+        <span class="badge" data-cart-count hidden>0</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+
+
+<main class="wrap page">
+  <div class="page-title"><a class="back" href="my.html" aria-label="뒤로">←</a>킵 보관함</div>
+
+  <section class="panel">
+    <div class="keep-meter">
+      <div style="color:var(--muted);font-size:13px;font-weight:700">보관 중인 상품금액</div>
+      <div class="keep-amount num">54,000원</div>
+      <div class="meter" role="progressbar" aria-valuenow="68" aria-valuemin="0" aria-valuemax="100"><i style="width:68%"></i></div>
+      <div class="keep-left">
+        무료배송까지 <b class="num">26,000원</b> · 지금 출고하면 배송비 4,000원
+        
+      </div>
+    </div>
+  </section>
+
+  
+
+  
+  <section class="panel">
+    <h2>보관 중 <span class="side" style="color:var(--muted)">2건</span></h2>
+    
+      <div style="padding:10px 0;border-bottom:1px solid var(--line)">
+        <div class="top-row" style="display:flex;justify-content:space-between;gap:8px"><a class="link num" href="order.html" style="font-size:13px">G261007-92694</a><span class="num" style="font-weight:800">30,000원</span></div>
+        <div style="font-size:14px">포켓몬 랜덤 블라인드 박스 <span style="color:var(--muted)">라이브 개봉 1 · 미개봉 발송 1</span></div>
+      </div>
+    
+      <div style="padding:10px 0;border-bottom:1px solid var(--line)">
+        <div class="top-row" style="display:flex;justify-content:space-between;gap:8px"><a class="link num" href="order.html" style="font-size:13px">G261007-80890</a><span class="num" style="font-weight:800">24,000원</span></div>
+        <div style="font-size:14px">산리오 랜덤 키링 <span style="color:var(--muted)">× 2</span></div>
+      </div>
+    
+  </section>
+
+  
+  <section class="panel" data-release data-fee="4000">
+    <h2>출고 요청</h2>
+    <p style="margin:0 0 12px;font-size:14px;color:var(--muted)">보관 중인 상품 <b style="color:var(--ink)">2건</b>을 한 번에 보내드려요.</p>
+    <label class="field"><span>받는 분</span><input name="name" value="김시청" maxlength="50"></label>
+    <label class="field"><span>휴대폰</span><input name="phone" value="01011112222" type="tel" inputmode="numeric"></label>
+    <div class="field"><span>주소</span>
+      <div class="field-row"><input name="zipcode" value="06000" readonly placeholder="우편번호" style="max-width:130px" data-zip><button type="button" class="btn soft grow" data-postcode>주소 찾기</button></div>
+      <input name="address1" value="서울 서초구 방배천로2길 21" readonly data-addr1>
+      <input name="address2" value="101호" maxlength="255" placeholder="상세주소" data-addr2>
+    </div>
+    <label class="field"><span>배송 메모 (선택)</span><input name="memo" maxlength="255"></label>
+    
+      <div style="font-weight:800;margin:8px 0">배송비 4,000원 결제</div>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="payment" value="bank" checked><span class="tile"><span class="t">🏦 계좌이체</span><span class="d">케이뱅크 입금</span></span></label>
+        <label class="choice"><input type="radio" name="payment" value="card" disabled><span class="tile"><span class="t">💳 카드결제</span><span class="d">준비 중이에요</span></span></label>
+      </div>
+      <label class="field" data-depositor style="margin-top:12px" ><span>입금자명</span><input name="depositorName" value="김시청" maxlength="50"></label>
+    
+    <button class="btn big block pink" type="button" data-release-go style="margin-top:8px">배송비 4,000원 결제하고 출고 요청</button>
+  </section>
+  
+  
+
+  
+  <section class="panel">
+    <h2>출고 요청 내역</h2>
+    <div class="list">
+    
+      <a class="item" href="shipment.html" style="box-shadow:none;background:#faf5f3">
+        <div class="top-row"><span class="meta num">2026.10.07 11:28</span><span class="chip dark">발송완료</span></div>
+        <div class="top-row"><span class="num" style="font-weight:800">36,000원</span><span class="meta">배송비 4,000원</span></div>
+      </a>
+    
+    </div>
+  </section>
+  
+</main>
+<div class="sheet-backdrop" data-pc-backdrop></div>
+<section class="sheet" id="postcodeSheet" role="dialog" aria-modal="true" aria-label="주소 찾기" hidden>
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2>주소 찾기</h2><button class="sheet-close" type="button" data-close-postcode aria-label="닫기">✕</button></div>
+  <div class="sheet-body" style="padding:0 12px 12px"><div data-pc-wrap style="height:min(70dvh,520px)"></div></div>
+</section>
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" defer></script>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="brand"><span class="g">깅</span>모지</div>
+    <nav class="foot-links">
+      <a href="page-terms.html">이용약관</a>
+      <a href="page-privacy.html" class="strong">개인정보처리방침</a>
+      <a href="page-refund.html">교환·환불 정책</a>
+    </nav>
+    <div class="biz">
+      <span>상호 깅모지</span><span>대표자 김민정</span><br>
+      <span>사업자등록번호 326-23-02307</span><br>
+      <span>통신판매업 신고번호 TEST</span><br>
+      <span>사업장 주소 서울</span><br>
+      <span>연락처 010-0000-0000</span><span>이메일 a@b.c</span>
+    </div>
+    <div style="margin-top:10px">© 2026 깅모지. All rights reserved.</div>
+  </div>
+</footer>
+<div class="sheet-backdrop" data-backdrop></div>
+
+<section class="sheet" id="productSheet" role="dialog" aria-modal="true" aria-labelledby="ps-name" hidden>
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><span></span><button class="sheet-close" type="button" data-close-sheet aria-label="닫기">✕</button></div>
+  <div class="sheet-body" data-ps-body></div>
+  <div class="sheet-foot">
+    <button class="btn big block" type="button" data-ps-add>담기</button>
+  </div>
+</section>
+
+<section class="sheet" id="cartSheet" role="dialog" aria-modal="true" aria-labelledby="cart-title" hidden>
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2 id="cart-title">장바구니</h2><button class="sheet-close" type="button" data-close-sheet aria-label="닫기">✕</button></div>
+  <div class="sheet-body" data-cart-body></div>
+  <div class="sheet-foot" data-cart-foot>
+    <div class="hint" data-cart-hint style="margin-bottom:10px"></div>
+    <div class="sum-row total"><span>상품금액</span><span class="v num" data-cart-total>0원</span></div>
+    <a class="btn big block" href="checkout.html" data-go-checkout style="margin-top:10px">결제하러 가기</a>
+  </div>
+</section>
+
+<script>window.GM = { live: true, showPrice: true, loggedIn: true, opt: { opened: '라이브 개봉', unopened: '미개봉 발송' }, card: false, freeShip: 80000, shipFee: 4000 };</script>
+<script src="static/js/shop.js"></script>
+<script src="static/js/pay.js"></script>
+
+</body>
+</html>
+

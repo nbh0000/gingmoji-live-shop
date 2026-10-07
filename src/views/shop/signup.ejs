@@ -1,0 +1,16 @@
+<%- include('../partials/head', { title: '회원가입', bodyClass: '' }) %>
+<main class="wrap page">
+  <div class="page-title"><a class="back" href="/login" aria-label="뒤로">←</a>회원가입</div>
+  <form class="panel" method="post" action="/signup">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <% if (error) { %><div class="err-box"><%= error %></div><% } %>
+    <label class="field"><span>아이디 (영문 소문자·숫자 4~20자)</span><input name="login_id" value="<%= form.login_id || '' %>" required pattern="[a-zA-Z0-9_]{4,20}" autocapitalize="none" autocorrect="off" autocomplete="username"></label>
+    <label class="field"><span>비밀번호 (6자 이상)</span><input name="password" type="password" required minlength="6" autocomplete="new-password"></label>
+    <label class="field"><span>비밀번호 확인</span><input name="password_confirm" type="password" required minlength="6" autocomplete="new-password"></label>
+    <%- include('../partials/profile-fields', { form: form }) %>
+    <label class="check"><input type="checkbox" name="agree" value="1" required> <span><a class="link" href="/page/terms" target="_blank">이용약관</a>과 <a class="link" href="/page/privacy" target="_blank">개인정보처리방침</a>에 동의합니다</span></label>
+    <button class="btn big block pink" type="submit" style="margin-top:8px">가입하고 시작하기</button>
+  </form>
+</main>
+<%- include('../partials/postcode') %>
+<%- include('../partials/foot') %>

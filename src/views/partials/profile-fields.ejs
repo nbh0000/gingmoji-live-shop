@@ -1,0 +1,18 @@
+<% var f = form || {}; %>
+<label class="field"><span>유튜브 닉네임 (방송 중 확인용)</span>
+  <input name="youtube_nickname" value="<%= f.youtube_nickname || '' %>" required maxlength="100" placeholder="예: 깅모지러버" autocomplete="nickname">
+</label>
+<label class="field"><span>이름</span>
+  <input name="name" value="<%= f.name || '' %>" required maxlength="50" autocomplete="name">
+</label>
+<label class="field"><span>휴대폰</span>
+  <input name="phone" value="<%= f.phone || '' %>" required inputmode="numeric" type="tel" maxlength="13" placeholder="01012345678" autocomplete="tel">
+</label>
+<div class="field"><span>주소</span>
+  <div class="field-row">
+    <input name="zipcode" value="<%= f.zipcode || '' %>" readonly placeholder="우편번호" style="max-width:130px" data-zip>
+    <button type="button" class="btn soft grow" data-postcode>주소 찾기</button>
+  </div>
+  <input name="address1" value="<%= f.address1 || '' %>" readonly required placeholder="주소 찾기를 눌러 주세요" data-addr1>
+  <input name="address2" value="<%= f.address2 || '' %>" maxlength="255" placeholder="상세주소 (동·호수)" data-addr2 autocomplete="address-line2">
+</div>

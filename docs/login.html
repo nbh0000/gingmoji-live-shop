@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#141011">
+<title>로그인 · 깅모지 LIVE</title>
+<meta name="description" content="깅모지 유튜브 라이브 방송 전용 주문 사이트">
+<meta property="og:title" content="깅모지 LIVE 주문">
+<meta property="og:image" content="/static/img/logo-wide.jpg">
+<link rel="icon" href="static/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="static/css/shop.css">
+<meta name="csrf" content="QWOysSwuMYNF6ErBSJn3Fpdh">
+<script src="static/js/demo-data.js"></script>
+<script src="static/js/demo-map.js"></script>
+<script src="static/js/demo.js"></script>
+</head>
+<body class="">
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="index.html" aria-label="깅모지 홈"><span class="g">깅</span>모지<span class="q">?</span></a>
+    <div class="top-actions">
+      <span class="live-pill on" data-live-pill>LIVE</span>
+      <a class="icon-btn" href="login.html" aria-label="로그인">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2"/></svg>
+      </a>
+      <button class="icon-btn" type="button" data-open-cart aria-label="장바구니">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 10.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>
+        <span class="badge" data-cart-count hidden>0</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+
+<main class="wrap page">
+  <div class="auth-hero">
+    <img src="static/img/logo-wide.jpg" alt="GINGMOJI">
+    <p>로그인하면 다음 주문부터 정보 입력 없이 바로 결제돼요</p>
+  </div>
+  <div class="panel">
+    <div class="stack">
+      <a class="btn big block kakao" href="#">카카오로 시작하기</a>
+      <a class="btn big block google" href="#">
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        구글로 시작하기</a>
+    </div>
+    <div class="or">또는 아이디로 로그인</div>
+    
+    <form method="post" action="#" data-orig-action="/login">
+      <input type="hidden" name="_csrf" value="QWOysSwuMYNF6ErBSJn3Fpdh">
+      <label class="field"><span>아이디</span><input name="login_id" value="" required autocapitalize="none" autocorrect="off" autocomplete="username"></label>
+      <label class="field"><span>비밀번호</span><input name="password" type="password" required autocomplete="current-password"></label>
+      <button class="btn big block" type="submit">로그인</button>
+    </form>
+    <p style="text-align:center;margin:16px 0 0;color:var(--muted);font-size:14px">처음이신가요? <a class="link" href="signup.html">아이디로 회원가입</a></p>
+  </div>
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <div class="brand"><span class="g">깅</span>모지</div>
+    <nav class="foot-links">
+      <a href="page-terms.html">이용약관</a>
+      <a href="page-privacy.html" class="strong">개인정보처리방침</a>
+      <a href="page-refund.html">교환·환불 정책</a>
+    </nav>
+    <div class="biz">
+      <span>상호 깅모지</span><span>대표자 김민정</span><br>
+      <span>사업자등록번호 326-23-02307</span><br>
+      <span>통신판매업 신고번호 TEST</span><br>
+      <span>사업장 주소 서울</span><br>
+      <span>연락처 010-0000-0000</span><span>이메일 a@b.c</span>
+    </div>
+    <div style="margin-top:10px">© 2026 깅모지. All rights reserved.</div>
+  </div>
+</footer>
+<div class="sheet-backdrop" data-backdrop></div>
+
+<section class="sheet" id="productSheet" role="dialog" aria-modal="true" aria-labelledby="ps-name" hidden>
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><span></span><button class="sheet-close" type="button" data-close-sheet aria-label="닫기">✕</button></div>
+  <div class="sheet-body" data-ps-body></div>
+  <div class="sheet-foot">
+    <button class="btn big block" type="button" data-ps-add>담기</button>
+  </div>
+</section>
+
+<section class="sheet" id="cartSheet" role="dialog" aria-modal="true" aria-labelledby="cart-title" hidden>
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2 id="cart-title">장바구니</h2><button class="sheet-close" type="button" data-close-sheet aria-label="닫기">✕</button></div>
+  <div class="sheet-body" data-cart-body></div>
+  <div class="sheet-foot" data-cart-foot>
+    <div class="hint" data-cart-hint style="margin-bottom:10px"></div>
+    <div class="sum-row total"><span>상품금액</span><span class="v num" data-cart-total>0원</span></div>
+    <a class="btn big block" href="checkout.html" data-go-checkout style="margin-top:10px">결제하러 가기</a>
+  </div>
+</section>
+
+<script>window.GM = { live: true, showPrice: true, loggedIn: false, opt: { opened: '라이브 개봉', unopened: '미개봉 발송' }, card: false, freeShip: 80000, shipFee: 4000 };</script>
+<script src="static/js/shop.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,68 @@
+<%- include('_head') %>
+<div class="page-head"><h1>설정</h1></div>
+<form method="post" action="/admin/settings" class="grid">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+  <section class="card">
+    <h2>방송 · 가격 노출</h2>
+    <div class="form-grid">
+      <label class="switch full"><input type="checkbox" name="always_show_price" value="1" <%= s.always_show_price ? 'checked' : '' %>> 가격 항상 노출 (PG 심사 기간용 · 주문은 방송 중에만 가능)</label>
+      <label class="field full"><span>고객 화면 공지 (선택)</span><textarea name="notice_text" style="min-height:70px" placeholder="예: 오늘 밤 9시 방송! 계좌이체는 30분 안에 입금해 주세요"><%= s.notice_text %></textarea></label>
+    </div>
+    <p class="muted" style="margin:10px 0 0">방송 시작/종료는 대시보드의 큰 버튼으로 바꿔요.</p>
+  </section>
+
+  <section class="card">
+    <h2>입금 계좌</h2>
+    <div class="form-grid">
+      <label class="field"><span>은행</span><input name="bank_name" value="<%= s.bank_name %>"></label>
+      <label class="field"><span>계좌번호</span><input name="bank_account" value="<%= s.bank_account %>" inputmode="numeric"></label>
+      <label class="field full"><span>예금주</span><input name="bank_holder" value="<%= s.bank_holder %>"></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>결제 대기 · 재고 선점</h2>
+    <div class="form-grid">
+      <label class="field"><span>카드 미결제 자동 취소 (분)</span><input name="card_hold_minutes" type="number" min="1" max="120" value="<%= s.card_hold_minutes %>"><small>주문 후 이 시간 안에 카드결제를 안 하면 주문 취소, 재고 복구</small></label>
+      <label class="field"><span>계좌이체 입금 기한 (시간)</span><input name="bank_auto_cancel_hours" type="number" min="0" step="0.5" value="<%= s.bank_auto_cancel_hours %>"><small><span class="todo">TODO 정책 확인</span> · 0이면 자동 취소 안 함 (관리자가 직접 취소). 바꾼 값은 이후 주문부터 적용</small></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>배송비</h2>
+    <div class="form-grid">
+      <label class="field"><span>무료배송 기준 금액 (원)</span><input name="free_shipping_threshold" type="number" min="0" step="1000" value="<%= s.free_shipping_threshold %>"><small>바로배송: 주문 상품금액 기준 / 킵 출고: 보관 중 상품금액 누적 기준</small></label>
+      <label class="field"><span>배송비 (원)</span><input name="shipping_fee" type="number" min="0" step="100" value="<%= s.shipping_fee %>"></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>포인트 <span class="todo" style="font-size:12.5px">TODO 정책 확인</span></h2>
+    <div class="form-grid">
+      <label class="field"><span>적립률 (%) · 계좌이체 결제 건만</span><input name="point_earn_rate" value="<%= s.point_earn_rate %>" inputmode="decimal" placeholder="비워두면 적립 안 함"><small>관리자가 입금 확인할 때 (상품금액 − 사용 포인트) × 적립률 적립, 취소 시 회수. 카드결제는 적립 없음</small></label>
+      <div></div>
+      <label class="switch full"><input type="checkbox" name="point_use_enabled" value="1" <%= s.point_use_enabled ? 'checked' : '' %>> 주문 시 포인트 사용 허용</label>
+      <label class="field"><span>최소 보유 포인트</span><input name="point_min_balance" type="number" min="0" value="<%= s.point_min_balance %>"><small>이 이상 보유해야 사용 가능</small></label>
+      <label class="field"><span>사용 단위 (P)</span><input name="point_use_unit" type="number" min="1" value="<%= s.point_use_unit %>"><small>예: 100이면 100P 단위로만</small></label>
+      <label class="field"><span>최대 사용 비율 (%)</span><input name="point_max_ratio" type="number" min="0" max="100" value="<%= s.point_max_ratio %>"><small>상품금액 대비</small></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>사업자 정보 (하단 노출 · PG 심사용)</h2>
+    <div class="form-grid">
+      <label class="field"><span>상호</span><input name="biz_name" value="<%= s.biz_name %>"></label>
+      <label class="field"><span>대표자</span><input name="biz_owner" value="<%= s.biz_owner %>"></label>
+      <label class="field"><span>사업자등록번호</span><input name="biz_reg_no" value="<%= s.biz_reg_no %>"></label>
+      <label class="field"><span>통신판매업 신고번호</span><input name="biz_mail_order_no" value="<%= s.biz_mail_order_no %>"></label>
+      <label class="field full"><span>사업장 주소</span><input name="biz_address" value="<%= s.biz_address %>"></label>
+      <label class="field"><span>연락처</span><input name="biz_phone" value="<%= s.biz_phone %>"></label>
+      <label class="field"><span>이메일</span><input name="biz_email" value="<%= s.biz_email %>"></label>
+      <label class="field"><span>개인정보 보호책임자</span><input name="biz_privacy_officer" value="<%= s.biz_privacy_officer %>"></label>
+    </div>
+  </section>
+
+  <div class="save-bar"><button class="btn pink lg" type="submit">설정 저장</button></div>
+</form>
+<%- include('_foot') %>

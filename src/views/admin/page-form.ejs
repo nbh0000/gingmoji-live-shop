@@ -1,0 +1,10 @@
+<%- include('_head') %>
+<div class="page-head"><h1><a href="/admin/pages" class="muted" style="text-decoration:none">←</a> <%= page.title %></h1><a class="btn ghost" href="/page/<%= page.slug %>" target="_blank">미리보기 ↗</a></div>
+<form method="post" action="/admin/pages/<%= page.slug %>" class="card">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <label class="field"><span>제목</span><input name="title" value="<%= page.title %>" required></label>
+  <label class="field" style="margin-top:12px"><span>본문</span><textarea name="content" style="min-height:60dvh;font-size:14px;line-height:1.6"><%= page.content %></textarea>
+    <small>"## 제목" 줄은 소제목, 빈 줄은 문단 구분이에요. {{상호}} {{대표자}} {{연락처}} {{이메일}} {{주소}} {{개인정보책임자}} 는 설정의 사업자 정보로 바뀝니다.</small></label>
+  <div class="save-bar"><button class="btn pink lg" type="submit">저장</button></div>
+</form>
+<%- include('_foot') %>

@@ -1,0 +1,94 @@
+<%- include('_head') %>
+<div class="page-head">
+  <h1><a href="/admin/orders" class="muted" style="text-decoration:none">←</a> 주문 상세</h1>
+  <span class="chip <%= o.status %>" style="font-size:14px;padding:4px 14px"><%= orderStatus(o) %></span>
+</div>
+
+<div class="two">
+  <div class="grid">
+    <section class="card">
+      <div class="nick" style="font-size:32px"><%= o.youtube_nickname || '-' %></div>
+      <div class="muted"><%= o.order_no %> · <%= fmt.dt(o.created_at) %></div>
+      <dl class="kv" style="margin-top:14px">
+        <dt>결제수단</dt><dd><span class="chip <%= o.payment_method %>"><%= L.payment[o.payment_method] %></span></dd>
+        <dt>배송방식</dt><dd><span class="chip <%= o.delivery_type %>"><%= L.delivery[o.delivery_type] %></span><% if (sr) { %> · <a href="/admin/shipments/<%= sr.id %>">출고요청 <%= sr.request_no %></a><% } %></dd>
+        <% if (o.payment_method === 'bank') { %><dt>입금자명</dt><dd><%= o.depositor_name %></dd><% } %>
+        <% if (o.paid_at) { %><dt>결제일시</dt><dd class="num"><%= fmt.dt(o.paid_at) %></dd><% } %>
+        <% if (o.reserve_expires_at && o.status === 'pending') { %><dt>재고 선점 만료</dt><dd class="num"><%= fmt.dt(o.reserve_expires_at) %></dd><% } %>
+        <% if (o.status === 'cancelled') { %><dt>취소</dt><dd><%= fmt.dt(o.cancelled_at) %> · <%= L.cancel[o.cancel_reason] || o.cancel_reason %></dd><% } %>
+        <% if (o.point_earned) { %><dt>적립 포인트</dt><dd class="num">+<%= fmt.num(o.point_earned) %>P</dd><% } %>
+      </dl>
+      <div class="actions" style="margin-top:16px">
+        <% if (o.status === 'pending' && o.payment_method === 'bank') { %>
+          <form method="post" action="/admin/orders/<%= o.id %>/confirm" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn lg ok" data-confirm="<%= fmt.won(o.total_amount) %> 입금을 확인할까요?">입금 확인</button></form>
+        <% } %>
+        <% (({ paid: ['preparing', 'shipped'], preparing: ['shipped', 'paid'], shipped: ['preparing'] })[o.status] || []).forEach(function (st) { if (o.shipment_request_id) return; %>
+          <form method="post" action="/admin/orders/<%= o.id %>/status" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn soft" name="status" value="<%= st %>"><%= L.status[st] %>(으)로 변경</button></form>
+        <% }) %>
+        <% if (o.status !== 'cancelled' && o.status !== 'shipped') { %>
+          <form method="post" action="/admin/orders/<%= o.id %>/cancel" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn danger" data-confirm="이 주문을 취소할까요? 재고가 되돌아가고<%= o.payment_method === 'card' && o.status !== 'pending' ? ' 카드 결제가 취소되며' : '' %> 포인트가 정리됩니다">주문 취소</button></form>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>상품</h2>
+      <table>
+        <thead><tr><th>상품</th><th class="right">수량</th><th class="right"><%= fmt.OPT.opened %></th><th class="right"><%= fmt.OPT.unopened %></th><th class="right">금액</th></tr></thead>
+        <tbody>
+        <% o.items.forEach(function (it) { %><tr><td><%= it.product_name %><div class="muted num" style="font-size:12px"><%= fmt.won(it.unit_price) %></div></td><td class="right num"><%= it.qty %></td><td class="right num"><%= it.qty_opened || '-' %></td><td class="right num"><%= it.qty_unopened || '-' %></td><td class="right num"><%= fmt.won(it.line_amount) %></td></tr><% }) %>
+        </tbody>
+      </table>
+      <dl class="kv" style="margin-top:12px">
+        <dt>상품금액</dt><dd class="num right"><%= fmt.won(o.items_amount) %></dd>
+        <dt>배송비</dt><dd class="num right"><%= fmt.won(o.shipping_fee) %></dd>
+        <% if (o.point_used) { %><dt>포인트 사용</dt><dd class="num right">-<%= fmt.num(o.point_used) %>P</dd><% } %>
+        <dt><b>결제금액</b></dt><dd class="num right" style="font-size:18px;font-weight:800"><%= fmt.won(o.total_amount) %></dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>받는 분 <a class="btn sm ghost" href="/admin/users/<%= u.id %>">회원 정보</a></h2>
+      <dl class="kv">
+        <dt>이름</dt><dd><%= o.recipient_name %></dd>
+        <dt>연락처</dt><dd><%= fmt.phone(o.recipient_phone) %></dd>
+        <dt>주소</dt><dd><%= o.zipcode ? '(' + o.zipcode + ') ' : '' %><%= o.address1 %> <%= o.address2 %></dd>
+        <dt>배송 메모</dt><dd><%= o.memo || '-' %></dd>
+        <dt>회원</dt><dd><%= u.name %> · <%= u.login_id || (u.kakao_id ? '카카오' : '구글') %></dd>
+      </dl>
+    </section>
+
+    <% if (!o.shipment_request_id && o.status !== 'cancelled' && o.delivery_type === 'direct') { %>
+    <section class="card" id="tracking">
+      <h2>송장</h2>
+      <form method="post" action="/admin/orders/<%= o.id %>/tracking" class="form-grid">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="field"><span>택배사</span><input name="courier" value="<%= o.courier || 'CJ대한통운' %>" list="couriers"></label>
+        <label class="field"><span>송장번호</span><input name="tracking_no" value="<%= o.tracking_no || '' %>" inputmode="numeric"></label>
+        <label class="switch full"><input type="checkbox" name="mark_shipped" value="1" <%= o.status !== 'shipped' ? 'checked' : '' %>> 저장하면서 발송완료로 변경</label>
+        <div class="full"><button class="btn" type="submit">송장 저장</button></div>
+      </form>
+      <datalist id="couriers"><option>CJ대한통운</option><option>우체국택배</option><option>한진택배</option><option>롯데택배</option><option>로젠택배</option><option>GS25 반값택배</option><option>CU 알뜰택배</option></datalist>
+    </section>
+    <% } %>
+
+    <section class="card">
+      <h2>관리자 메모</h2>
+      <form method="post" action="/admin/orders/<%= o.id %>/memo">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="field"><textarea name="admin_memo" placeholder="고객에게 보이지 않아요"><%= o.admin_memo || '' %></textarea></label>
+        <button class="btn sm" type="submit" style="margin-top:8px">메모 저장</button>
+      </form>
+    </section>
+
+    <% if (pays.length) { %>
+    <section class="card">
+      <h2>결제 기록</h2>
+      <% pays.forEach(function (p) { %><div class="muted" style="font-size:13px"><%= L.payment[p.method] %> · <%= fmt.won(p.amount) %> · <%= p.status %> · <%= fmt.dt(p.paid_at || p.created_at) %><% if (p.pg_payment_id) { %> · <span class="num"><%= p.pg_payment_id %></span><% } %></div><% }) %>
+    </section>
+    <% } %>
+  </div>
+</div>
+<%- include('_foot') %>

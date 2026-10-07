@@ -1,0 +1,25 @@
+<%- include('_head') %>
+<div class="page-head"><h1>회원</h1></div>
+<form class="filters" method="get">
+  <input type="search" name="q" value="<%= q %>" placeholder="유튜브 닉네임, 이름, 휴대폰, 아이디, 이메일">
+  <button class="btn" type="submit">검색</button>
+</form>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>유튜브 닉네임</th><th>이름 / 연락처</th><th>가입</th><th class="right">포인트</th><th>주문</th><th>가입일</th></tr></thead>
+    <tbody>
+    <% if (!list.length) { %><tr><td colspan="6" class="empty">회원이 없어요</td></tr><% } %>
+    <% list.forEach(function (u) { %>
+      <tr class="row">
+        <td><a class="nick" href="/admin/users/<%= u.id %>"><%= u.youtube_nickname || '(정보 미입력)' %></a></td>
+        <td><%= u.name || '-' %><div class="muted num"><%= fmt.phone(u.phone) %></div></td>
+        <td><%= u.login_id ? '아이디 ' + u.login_id : (u.kakao_id ? '카카오' : (u.google_id ? '구글' : '-')) %></td>
+        <td class="right num"><%= fmt.num(u.point_balance) %>P</td>
+        <td class="num"><%= u.order_count %>건</td>
+        <td class="num muted"><%= fmt.date(u.created_at) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<%- include('_foot') %>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141011">
+<meta name="robots" content="noindex">
+<title>킵 관리 · 깅모지 관리자</title>
+<link rel="icon" href="static/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="static/css/admin.css">
+<meta name="csrf" content="tzytsDLk7T8Cgn3jwr73ZsfB">
+<script src="static/js/demo-data.js"></script>
+<script src="static/js/demo-map.js"></script>
+<script src="static/js/demo.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="logo" href="admin.html"><span class="g">깅</span>모지<small>ADMIN</small></a>
+    <nav class="nav">
+      
+      <a href="admin.html" class=""><span><span class="dot on"></span>대시보드</span></a>
+      <a href="admin-orders.html" class=""><span>주문 관리</span><span class="cnt" title="입금 대기">1</span></a>
+      <a href="admin-keep.html" class="on"><span>킵 관리</span></a>
+      <a href="admin-products.html" class=""><span>상품·재고</span></a>
+      <a href="admin-users.html" class=""><span>회원</span></a>
+      <a href="admin-settings.html" class=""><span>설정</span></a>
+      <a href="admin-pages.html" class=""><span>약관·정책</span></a>
+    </nav>
+    <div class="side-foot">
+      <a href="index.html" target="_blank">고객 화면 열기 ↗</a>
+      <form method="post" action="#" data-orig-action="/admin/logout"><input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB"><button class="btn sm ghost" type="submit">로그아웃</button></form>
+    </div>
+  </aside>
+  <main class="main">
+  
+
+<div class="page-head"><h1>킵 관리</h1></div>
+<nav class="seg">
+  <a class="on" href="admin-keep.html">출고 요청</a>
+  <a class="" href="admin-keep-members.html">회원별 보관 (1명)</a>
+</nav>
+
+
+  <nav class="seg">
+    
+      <a class="" href="admin-keep.html">처리할 요청</a>
+    
+      <a class="" href="admin-keep.html">배송비 결제대기</a>
+    
+      <a class="" href="admin-keep.html">출고 요청</a>
+    
+      <a class="" href="admin-keep.html">배송준비</a>
+    
+      <a class="" href="admin-keep.html">발송완료</a>
+    
+      <a class="" href="admin-keep.html">취소</a>
+    
+      <a class="on" href="admin-keep.html">전체</a>
+    
+  </nav>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유튜브 닉네임</th><th class="right">보관 금액</th><th class="right">배송비</th><th>주문 수</th><th>상태</th><th>요청일시</th><th>처리</th></tr></thead>
+      <tbody>
+      
+      
+        <tr class="row">
+          <td><a class="nick" href="admin-shipment.html">깅모지러버</a><span class="nick-sub">김시청 · S261007-72444</span></td>
+          <td class="right num amount">36,000원</td>
+          <td class="right num">4,000원 (계좌이체)</td>
+          <td class="num">1건</td>
+          <td><span class="chip shipped">발송완료</span></td>
+          <td class="num muted nowrap">2026.10.07 11:28</td>
+          <td><div class="actions">
+            
+            
+            <a class="btn sm ghost" href="admin-shipment.html">상세·송장</a>
+          </div></td>
+        </tr>
+      
+      </tbody>
+    </table>
+  </div>
+
+  </main>
+</div>
+<script src="static/js/admin.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,84 @@
+<%- include('../partials/head', { title: '주문 내역', bodyClass: '' }) %>
+<%
+  var label = o.status === 'pending' ? (o.payment_method === 'card' ? '결제대기' : '입금대기') : ({ paid: '결제완료', kept: '킵보관', preparing: '배송준비', shipped: '발송완료', cancelled: '취소' })[o.status];
+  var chip = { pending: 'warn', paid: 'ok', kept: '', preparing: 'ok', shipped: 'dark', cancelled: 'gray' }[o.status];
+%>
+<main class="wrap page">
+  <% if (justPlaced && o.status !== 'cancelled') { %>
+  <div class="done-hero">
+    <div class="heart">♥</div>
+    <div class="big"><%= o.status === 'pending' && o.payment_method === 'bank' ? '주문이 접수됐어요' : (o.status === 'pending' ? '결제를 기다리고 있어요' : '주문 완료!') %></div>
+    <p style="color:var(--muted);margin:4px 0 0">주문번호 <b class="num" style="color:var(--ink)"><%= o.order_no %></b></p>
+  </div>
+  <% } else { %>
+  <div class="page-title"><a class="back" href="/my/orders" aria-label="뒤로">←</a>주문 상세</div>
+  <% } %>
+
+  <% if (o.status === 'pending' && o.payment_method === 'bank') { %>
+  <section class="bank-card" style="margin-bottom:14px">
+    <div class="row"><span class="k">입금하실 금액</span><button class="copy" type="button" data-copy="<%= o.total_amount %>">금액 복사</button></div>
+    <div class="amount num"><%= fmt.won(o.total_amount) %></div>
+    <div class="row"><div><div class="k">입금 계좌</div><div class="v num"><%= s.bank_name %> <%= s.bank_account %></div></div><button class="copy" type="button" data-copy="<%= s.bank_account %>">계좌 복사</button></div>
+    <div class="row"><div><div class="k">예금주</div><div class="v"><%= s.bank_holder %></div></div></div>
+    <div class="row"><div><div class="k">입금자명</div><div class="v"><%= o.depositor_name %></div></div></div>
+    <% if (o.reserve_expires_at) { %><div class="k" style="color:var(--pink)"><%= fmt.dt(o.reserve_expires_at) %>까지 입금되지 않으면 주문이 자동 취소돼요</div><% } %>
+    <div class="k">입금이 확인되면 결제완료로 바뀌어요. 입금자명이 다르면 확인이 늦어질 수 있어요.</div>
+  </section>
+  <% } %>
+
+  <% if (o.status === 'pending' && o.payment_method === 'card') { %>
+  <section class="panel tint">
+    <h2>카드결제를 완료해 주세요</h2>
+    <p style="margin:0 0 12px;color:var(--muted);font-size:14px"><%= fmt.dt(o.reserve_expires_at) %>까지 결제하지 않으면 주문이 자동 취소되고 재고가 풀려요.</p>
+    <button class="btn big block pink" type="button" data-repay="<%= o.order_no %>" data-kind="order">카드로 <%= fmt.won(o.total_amount) %> 결제하기</button>
+  </section>
+  <% } %>
+
+  <section class="panel">
+    <h2><span>주문 정보</span><span class="chip <%= chip %>"><%= label %></span></h2>
+    <dl class="kv">
+      <dt>주문번호</dt><dd class="num"><%= o.order_no %></dd>
+      <dt>주문일시</dt><dd class="num"><%= fmt.dt(o.created_at) %></dd>
+      <dt>배송방식</dt><dd><%= o.delivery_type === 'keep' ? '킵 (보관)' : '바로배송' %></dd>
+      <dt>결제수단</dt><dd><%= o.payment_method === 'card' ? '카드결제' : '계좌이체' %></dd>
+      <% if (o.tracking_no) { %><dt>송장</dt><dd><%= o.courier %> <%= o.tracking_no %></dd><% } %>
+      <% if (o.status === 'cancelled') { %><dt>취소</dt><dd><%= fmt.dt(o.cancelled_at) %></dd><% } %>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>상품</h2>
+    <% o.items.forEach(function (it) { %>
+    <div class="cart-line">
+      <div class="info">
+        <div class="nm"><%= it.product_name %></div>
+        <div class="opt"><%= fmt.optText(it) || ('수량 ' + it.qty) %></div>
+      </div>
+      <div class="amt num"><%= fmt.won(it.line_amount) %></div>
+    </div>
+    <% }) %>
+    <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px">
+      <div class="sum-row"><span class="k">상품금액</span><span class="num"><%= fmt.won(o.items_amount) %></span></div>
+      <div class="sum-row"><span class="k">배송비</span><span class="num"><%= o.delivery_type === 'keep' ? '킵 (출고 시 결정)' : fmt.won(o.shipping_fee) %></span></div>
+      <% if (o.point_used) { %><div class="sum-row"><span class="k">포인트 사용</span><span class="num minus">-<%= fmt.num(o.point_used) %>P</span></div><% } %>
+      <div class="sum-row total"><span>결제금액</span><span class="v num"><%= fmt.won(o.total_amount) %></span></div>
+      <% if (o.point_earned) { %><div class="sum-row"><span class="k">적립 포인트</span><span class="num">+<%= fmt.num(o.point_earned) %>P</span></div><% } %>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>받는 분</h2>
+    <div class="addr-view">
+      <div class="who"><%= o.recipient_name %> · <%= fmt.phone(o.recipient_phone) %></div>
+      <div><%= o.zipcode ? '(' + o.zipcode + ') ' : '' %><%= o.address1 %> <%= o.address2 %></div>
+      <% if (o.memo) { %><div class="muted">메모: <%= o.memo %></div><% } %>
+    </div>
+  </section>
+
+  <div class="stack">
+    <% if (o.status === 'kept') { %><a class="btn big block pink" href="/my/keep">킵 보관함 보기</a><% } %>
+    <a class="btn big block" href="/">계속 쇼핑하기</a>
+    <% if (o.status === 'pending') { %><button class="btn block ghost" type="button" data-cancel-order="<%= o.order_no %>">주문 취소</button><% } %>
+  </div>
+</main>
+<%- include('../partials/foot', { scripts: (o.status === 'pending' && o.payment_method === 'card') ? ['https://cdn.portone.io/v2/browser-sdk.js', '/static/js/pay.js?v=1'] : ['/static/js/pay.js?v=1'] }) %>

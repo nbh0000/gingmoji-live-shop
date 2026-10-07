@@ -1,0 +1,61 @@
+<%- include('_head') %>
+<div class="page-head"><h1>킵 관리</h1></div>
+<nav class="seg">
+  <a class="<%= tab === 'requests' ? 'on' : '' %>" href="/admin/keep">출고 요청</a>
+  <a class="<%= tab === 'members' ? 'on' : '' %>" href="/admin/keep?tab=members">회원별 보관 (<%= members.length %>명)</a>
+</nav>
+
+<% if (tab === 'requests') { %>
+  <nav class="seg">
+    <% [['open', '처리할 요청'], ['pending_payment', '배송비 결제대기'], ['requested', '출고 요청'], ['preparing', '배송준비'], ['shipped', '발송완료'], ['cancelled', '취소'], ['all', '전체']].forEach(function (t) { %>
+      <a class="<%= st === t[0] ? 'on' : '' %>" href="/admin/keep?status=<%= t[0] %>"><%= t[1] %></a>
+    <% }) %>
+  </nav>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유튜브 닉네임</th><th class="right">보관 금액</th><th class="right">배송비</th><th>주문 수</th><th>상태</th><th>요청일시</th><th>처리</th></tr></thead>
+      <tbody>
+      <% if (!requests.length) { %><tr><td colspan="7" class="empty">출고 요청이 없어요</td></tr><% } %>
+      <% requests.forEach(function (r) { %>
+        <tr class="row">
+          <td><a class="nick" href="/admin/shipments/<%= r.id %>"><%= r.youtube_nickname || '-' %></a><span class="nick-sub"><%= r.recipient_name %> · <%= r.request_no %></span></td>
+          <td class="right num amount"><%= fmt.won(r.kept_amount) %></td>
+          <td class="right num"><%= r.shipping_fee ? fmt.won(r.shipping_fee) + ' (' + L.payment[r.payment_method] + ')' : '무료' %></td>
+          <td class="num"><%= r.order_count %>건</td>
+          <td><span class="chip <%= r.status %>"><%= shipStatus(r) %></span></td>
+          <td class="num muted nowrap"><%= fmt.dt(r.created_at) %></td>
+          <td><div class="actions">
+            <% if (r.status === 'pending_payment' && r.payment_method === 'bank') { %>
+              <form method="post" action="/admin/shipments/<%= r.id %>/confirm" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm ok" data-confirm="배송비 <%= fmt.won(r.shipping_fee) %> 입금을 확인할까요?">배송비 입금 확인</button></form>
+            <% } %>
+            <% if (r.status === 'requested') { %>
+              <form method="post" action="/admin/shipments/<%= r.id %>/status" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm soft" name="status" value="preparing">배송준비</button></form>
+            <% } %>
+            <a class="btn sm ghost" href="/admin/shipments/<%= r.id %>">상세·송장</a>
+          </div></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>유튜브 닉네임</th><th class="right">보관 금액</th><th>무료배송까지</th><th>주문 수</th><th>최초 보관일</th><th></th></tr></thead>
+      <tbody>
+      <% if (!members.length) { %><tr><td colspan="6" class="empty">보관 중인 회원이 없어요</td></tr><% } %>
+      <% members.forEach(function (m) { var left = Math.max(0, threshold - m.kept_amount); %>
+        <tr class="row">
+          <td><a class="nick" href="/admin/keep/user/<%= m.id %>"><%= m.youtube_nickname || '-' %></a><span class="nick-sub"><%= m.name %> · <%= fmt.phone(m.phone) %></span></td>
+          <td class="right num amount"><%= fmt.won(m.kept_amount) %></td>
+          <td><%= left ? fmt.won(left) : '' %><% if (!left) { %><span class="chip paid">무료배송 가능</span><% } %></td>
+          <td class="num"><%= m.order_count %>건</td>
+          <td class="num muted"><%= fmt.date(m.since) %></td>
+          <td><a class="btn sm ghost" href="/admin/keep/user/<%= m.id %>">보관 목록</a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+<%- include('_foot') %>

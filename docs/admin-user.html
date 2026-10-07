@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141011">
+<meta name="robots" content="noindex">
+<title>깅모지러버 · 깅모지 관리자</title>
+<link rel="icon" href="static/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="static/css/admin.css">
+<meta name="csrf" content="tzytsDLk7T8Cgn3jwr73ZsfB">
+<script src="static/js/demo-data.js"></script>
+<script src="static/js/demo-map.js"></script>
+<script src="static/js/demo.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="logo" href="admin.html"><span class="g">깅</span>모지<small>ADMIN</small></a>
+    <nav class="nav">
+      
+      <a href="admin.html" class=""><span><span class="dot on"></span>대시보드</span></a>
+      <a href="admin-orders.html" class=""><span>주문 관리</span><span class="cnt" title="입금 대기">1</span></a>
+      <a href="admin-keep.html" class=""><span>킵 관리</span></a>
+      <a href="admin-products.html" class=""><span>상품·재고</span></a>
+      <a href="admin-users.html" class="on"><span>회원</span></a>
+      <a href="admin-settings.html" class=""><span>설정</span></a>
+      <a href="admin-pages.html" class=""><span>약관·정책</span></a>
+    </nav>
+    <div class="side-foot">
+      <a href="index.html" target="_blank">고객 화면 열기 ↗</a>
+      <form method="post" action="#" data-orig-action="/admin/logout"><input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB"><button class="btn sm ghost" type="submit">로그아웃</button></form>
+    </div>
+  </aside>
+  <main class="main">
+  
+
+<div class="page-head"><h1><a href="admin-users.html" class="muted" style="text-decoration:none">←</a> 회원 정보</h1></div>
+<div class="two">
+  <div class="grid">
+    <section class="card">
+      <div class="nick" style="font-size:32px">깅모지러버</div>
+      <dl class="kv" style="margin-top:12px">
+        <dt>이름</dt><dd>김시청</dd>
+        <dt>휴대폰</dt><dd class="num">010-1111-2222</dd>
+        <dt>주소</dt><dd>(06000) 서울 서초구 방배천로2길 21 101호</dd>
+        <dt>로그인</dt><dd>아이디 live_fan1</dd>
+        <dt>이메일</dt><dd>-</dd>
+        <dt>가입일</dt><dd class="num">2026.10.07 11:28</dd>
+        <dt>킵 보관</dt><dd><a href="admin-keep-user.html">54,000원 (2건)</a></dd>
+      </dl>
+    </section>
+    <section class="card">
+      <h2>관리자 메모</h2>
+      <form method="post" action="#" data-orig-action="/admin/users/1/memo">
+        <input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB">
+        <label class="field"><textarea name="admin_memo"></textarea></label>
+        <button class="btn sm" type="submit" style="margin-top:8px">저장</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>최근 주문</h2>
+      <table>
+        <tbody>
+        
+        
+          <tr><td><a class="num" href="admin-order.html">G261007-17462</a><div class="muted num" style="font-size:12px">2026.10.07 14:34</div></td>
+          <td><span class="chip bank">계좌이체</span> <span class="chip direct">바로배송</span></td>
+          <td class="right num">95,000원</td><td><span class="chip pending">입금대기</span></td></tr>
+        
+          <tr><td><a class="num" href="admin-order.html">G261007-80890</a><div class="muted num" style="font-size:12px">2026.10.07 14:34</div></td>
+          <td><span class="chip bank">계좌이체</span> <span class="chip keep">킵</span></td>
+          <td class="right num">24,000원</td><td><span class="chip kept">킵보관</span></td></tr>
+        
+          <tr><td><a class="num" href="admin-order.html">G261007-92694</a><div class="muted num" style="font-size:12px">2026.10.07 14:34</div></td>
+          <td><span class="chip bank">계좌이체</span> <span class="chip keep">킵</span></td>
+          <td class="right num">30,000원</td><td><span class="chip kept">킵보관</span></td></tr>
+        
+          <tr><td><a class="num" href="admin-order.html">G261007-31690</a><div class="muted num" style="font-size:12px">2026.10.07 11:30</div></td>
+          <td><span class="chip bank">계좌이체</span> <span class="chip direct">바로배송</span></td>
+          <td class="right num">34,000원</td><td><span class="chip paid">결제완료</span></td></tr>
+        
+          <tr><td><a class="num" href="admin-order.html">G261007-61712</a><div class="muted num" style="font-size:12px">2026.10.07 11:28</div></td>
+          <td><span class="chip bank">계좌이체</span> <span class="chip direct">바로배송</span></td>
+          <td class="right num">16,000원</td><td><span class="chip cancelled">취소</span></td></tr>
+        
+          <tr><td><a class="num" href="admin-order.html">G261007-33584</a><div class="muted num" style="font-size:12px">2026.10.07 11:28</div></td>
+          <td><span class="chip bank">계좌이체</span> <span class="chip keep">킵</span></td>
+          <td class="right num">36,000원</td><td><span class="chip shipped">발송완료</span></td></tr>
+        
+          <tr><td><a class="num" href="admin-order.html">G261007-20819</a><div class="muted num" style="font-size:12px">2026.10.07 11:28</div></td>
+          <td><span class="chip bank">계좌이체</span> <span class="chip direct">바로배송</span></td>
+          <td class="right num">78,000원</td><td><span class="chip paid">결제완료</span></td></tr>
+        
+        </tbody>
+      </table>
+    </section>
+  </div>
+  <div class="grid">
+    <section class="card">
+      <h2>포인트 <span class="num" style="font-family:var(--f-display);font-size:26px;color:var(--pink-dd)">5,520P</span></h2>
+      <form method="post" action="#" data-orig-action="/admin/users/1/points" class="form-grid">
+        <input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB">
+        <label class="field"><span>구분</span><select name="mode"><option value="add">지급</option><option value="sub">차감</option></select></label>
+        <label class="field"><span>포인트</span><input name="amount" inputmode="numeric" required></label>
+        <label class="field full"><span>사유 (회원에게 보여요)</span><input name="memo" maxlength="200" placeholder="예: 방송 이벤트 당첨"></label>
+        <div class="full"><button class="btn" type="submit">적용</button></div>
+      </form>
+    </section>
+    <section class="card">
+      <h2>포인트 내역</h2>
+      <table>
+        <thead><tr><th>일시</th><th>구분</th><th class="right">포인트</th><th class="right">잔액</th></tr></thead>
+        <tbody>
+        
+        
+          <tr><td class="num muted nowrap">2026.10.07 14:34</td>
+          <td>적립<div class="muted" style="font-size:12px">G261007-92694 주문 G261007-92694 계좌이체 적립</div></td>
+          <td class="right num" style="font-weight:700;color:var(--pink-dd)">+900</td>
+          <td class="right num muted">5,520</td></tr>
+        
+          <tr><td class="num muted nowrap">2026.10.07 14:34</td>
+          <td>적립<div class="muted" style="font-size:12px">G261007-80890 주문 G261007-80890 계좌이체 적립</div></td>
+          <td class="right num" style="font-weight:700;color:var(--pink-dd)">+720</td>
+          <td class="right num muted">4,620</td></tr>
+        
+          <tr><td class="num muted nowrap">2026.10.07 14:34</td>
+          <td>적립<div class="muted" style="font-size:12px">G261007-31690 주문 G261007-31690 계좌이체 적립</div></td>
+          <td class="right num" style="font-weight:700;color:var(--pink-dd)">+900</td>
+          <td class="right num muted">3,900</td></tr>
+        
+          <tr><td class="num muted nowrap">2026.10.07 11:28</td>
+          <td>관리자 지급<div class="muted" style="font-size:12px"> 방송 이벤트</div></td>
+          <td class="right num" style="font-weight:700;color:var(--pink-dd)">+3,000</td>
+          <td class="right num muted">3,000</td></tr>
+        
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>
+  </main>
+</div>
+<script src="static/js/admin.js"></script>
+</body>
+</html>
+

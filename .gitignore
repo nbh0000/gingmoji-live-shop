@@ -1,0 +1,9 @@
+.env
+.env.test
+*.log
+.DS_Store
+# node_modules: 카페24가 서버에서 npm install을 하지 않는 경우 이 줄을 지우고 커밋하세요 (README 참고)
+node_modules/
+
+# 원본 참고자료 (사업자등록증 등 개인정보 포함) — 로고는 src/public/img 에 복사됨
+assets/

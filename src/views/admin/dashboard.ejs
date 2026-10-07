@@ -1,0 +1,58 @@
+<%- include('_head') %>
+<div class="page-head"><h1>대시보드</h1><span class="muted num" data-clock></span></div>
+
+<section class="live-switch">
+  <div>
+    <div class="state <%= s.live_on ? 'on' : '' %>"><span class="dot <%= s.live_on ? 'on' : '' %>"></span><%= s.live_on ? '방송 중 · 주문 받는 중' : '방송 종료 · 주문 막힘' %></div>
+    <div class="desc"><%= s.live_on ? '고객 화면에 가격이 보이고 주문할 수 있어요' : (s.always_show_price ? '가격만 노출 중(PG 심사용). 주문은 막혀 있어요' : '가격이 숨겨지고 주문 버튼이 비활성화돼요') %></div>
+  </div>
+  <form method="post" action="/admin/live">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="on" value="<%= s.live_on ? '0' : '1' %>">
+    <button class="big-toggle <%= s.live_on ? 'stop' : '' %>" type="submit"><%= s.live_on ? '방송 종료' : '방송 시작' %></button>
+  </form>
+</section>
+
+<div class="stats" data-stats>
+  <a class="stat" href="/admin/orders"><span class="k">오늘 주문</span><span class="v num" data-st="todayOrders"><%= fmt.num(st.todayOrders) %></span><span class="s">취소 제외</span></a>
+  <a class="stat" href="/admin/orders"><span class="k">오늘 결제 매출</span><span class="v num" data-st="todayRevenue"><%= fmt.won(st.todayRevenue) %></span><span class="s"><span data-st="todayPaid"><%= st.todayPaid %></span>건 결제완료</span></a>
+  <a class="stat <%= st.bankPending ? 'alert' : '' %>" href="/admin/orders?status=bank_pending"><span class="k">입금 대기</span><span class="v num" data-st="bankPending"><%= st.bankPending %></span><span class="s num" data-st="bankPendingAmount"><%= fmt.won(st.bankPendingAmount) %></span></a>
+  <a class="stat <%= st.shipRequests ? 'alert' : '' %>" href="/admin/keep"><span class="k">킵 출고 요청</span><span class="v num" data-st="shipRequests"><%= st.shipRequests %></span><span class="s">배송 준비할 바로배송 <span data-st="toPrepare"><%= st.toPrepare %></span>건</span></a>
+</div>
+
+<div class="two">
+  <section class="card">
+    <h2>최근 주문 <span class="muted" style="font-size:12px;font-weight:500">10초마다 자동 갱신</span></h2>
+    <div class="table-wrap" style="box-shadow:none">
+      <table>
+        <thead><tr><th>닉네임</th><th class="right">금액</th><th>상태</th><th>시각</th></tr></thead>
+        <tbody data-recent>
+        <% recent.forEach(function (o) { %>
+          <tr><td><a class="nick" style="font-size:18px" href="/admin/orders/<%= o.id %>"><%= o.youtube_nickname || '-' %></a><span class="nick-sub"><%= o.recipient_name %> · <%= L.delivery[o.delivery_type] %> · <%= L.payment[o.payment_method] %></span></td>
+          <td class="right num amount"><%= fmt.won(o.total_amount) %></td><td><span class="chip <%= o.status %>"><%= orderStatus(o) %></span></td><td class="num muted nowrap"><%= fmt.dt(o.created_at).slice(11) %></td></tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="card">
+    <h2>빠른 설정</h2>
+    <form method="post" action="/admin/price-always" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <input type="hidden" name="on" value="<%= s.always_show_price ? '0' : '1' %>">
+      <div><b>가격 항상 노출</b><div class="muted" style="font-size:12.5px">PG 심사 기간용. 방송과 무관하게 가격만 보여요 (주문은 방송 중에만)</div></div>
+      <button class="btn sm <%= s.always_show_price ? 'pink' : 'ghost' %>" type="submit"><%= s.always_show_price ? '켜짐' : '꺼짐' %></button>
+    </form>
+    <dl class="kv" style="margin-top:12px">
+      <dt>입금 계좌</dt><dd><%= s.bank_name %> <%= s.bank_account %> (<%= s.bank_holder %>)</dd>
+      <dt>배송비</dt><dd><%= fmt.won(s.free_shipping_threshold) %> 이상 무료 / 미만 <%= fmt.won(s.shipping_fee) %></dd>
+      <dt>카드 결제 대기</dt><dd><%= s.card_hold_minutes %>분 후 자동 취소</dd>
+      <dt>계좌 입금 기한</dt><dd><%= s.bank_auto_cancel_hours > 0 ? s.bank_auto_cancel_hours + '시간 후 자동 취소' : '자동 취소 안 함' %></dd>
+      <dt>포인트 적립</dt><dd><%= s.point_earn_rate ? s.point_earn_rate + '% (계좌이체만)' : '미설정 (적립 안 함)' %></dd>
+      <dt>카드결제</dt><dd><%= config.portone.enabled ? '사용 가능' : '포트원 키 미설정 → 계좌이체만' %></dd>
+    </dl>
+    <a class="btn sm ghost" href="/admin/settings" style="margin-top:12px">설정 변경</a>
+  </section>
+</div>
+<script>window.ADMIN_DASH = true;</script>
+<%- include('_foot') %>

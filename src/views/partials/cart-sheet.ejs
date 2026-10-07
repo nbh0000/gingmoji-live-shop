@@ -1,0 +1,21 @@
+<div class="sheet-backdrop" data-backdrop></div>
+
+<section class="sheet" id="productSheet" role="dialog" aria-modal="true" aria-labelledby="ps-name" hidden>
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><span></span><button class="sheet-close" type="button" data-close-sheet aria-label="닫기">✕</button></div>
+  <div class="sheet-body" data-ps-body></div>
+  <div class="sheet-foot">
+    <button class="btn big block" type="button" data-ps-add>담기</button>
+  </div>
+</section>
+
+<section class="sheet" id="cartSheet" role="dialog" aria-modal="true" aria-labelledby="cart-title" hidden>
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><h2 id="cart-title">장바구니</h2><button class="sheet-close" type="button" data-close-sheet aria-label="닫기">✕</button></div>
+  <div class="sheet-body" data-cart-body></div>
+  <div class="sheet-foot" data-cart-foot>
+    <div class="hint" data-cart-hint style="margin-bottom:10px"></div>
+    <div class="sum-row total"><span>상품금액</span><span class="v num" data-cart-total>0원</span></div>
+    <a class="btn big block" href="/checkout" data-go-checkout style="margin-top:10px">결제하러 가기</a>
+  </div>
+</section>

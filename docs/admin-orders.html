@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141011">
+<meta name="robots" content="noindex">
+<title>주문 관리 · 깅모지 관리자</title>
+<link rel="icon" href="static/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="static/css/admin.css">
+<meta name="csrf" content="tzytsDLk7T8Cgn3jwr73ZsfB">
+<script src="static/js/demo-data.js"></script>
+<script src="static/js/demo-map.js"></script>
+<script src="static/js/demo.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="logo" href="admin.html"><span class="g">깅</span>모지<small>ADMIN</small></a>
+    <nav class="nav">
+      
+      <a href="admin.html" class=""><span><span class="dot on"></span>대시보드</span></a>
+      <a href="admin-orders.html" class="on"><span>주문 관리</span><span class="cnt" title="입금 대기">1</span></a>
+      <a href="admin-keep.html" class=""><span>킵 관리</span></a>
+      <a href="admin-products.html" class=""><span>상품·재고</span></a>
+      <a href="admin-users.html" class=""><span>회원</span></a>
+      <a href="admin-settings.html" class=""><span>설정</span></a>
+      <a href="admin-pages.html" class=""><span>약관·정책</span></a>
+    </nav>
+    <div class="side-foot">
+      <a href="index.html" target="_blank">고객 화면 열기 ↗</a>
+      <form method="post" action="#" data-orig-action="/admin/logout"><input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB"><button class="btn sm ghost" type="submit">로그아웃</button></form>
+    </div>
+  </aside>
+  <main class="main">
+  
+
+
+<div class="page-head">
+  <h1>주문 관리</h1>
+  <div class="actions">
+    <a class="btn ghost" href="admin-orders.html">↻ 10초 자동 새로고침</a>
+    <a class="btn" href="#">엑셀(CSV) 다운로드</a>
+  </div>
+</div>
+
+<nav class="seg">
+  <a class="on" href="admin-orders.html">전체(취소 제외)</a><a class="" href="admin-orders.html">입금대기</a><a class="" href="admin-orders.html">결제대기</a><a class="" href="admin-orders.html">결제완료</a><a class="" href="admin-orders.html">배송준비</a><a class="" href="admin-orders.html">발송완료</a><a class="" href="admin-orders.html">킵보관</a><a class="" href="admin-orders.html">취소</a>
+</nav>
+
+<form class="filters" method="get" action="#" data-orig-action="/admin/orders">
+  <input type="hidden" name="status" value="">
+  
+  <input type="search" name="q" value="" placeholder="유튜브 닉네임, 이름, 주문번호, 입금자명, 연락처">
+  <select name="method"><option value="">결제수단 전체</option><option value="bank" >계좌이체</option><option value="card" >카드결제</option></select>
+  <select name="delivery"><option value="">배송방식 전체</option><option value="direct" >바로배송</option><option value="keep" >킵</option></select>
+  <input type="date" name="from" value="" aria-label="시작일"><input type="date" name="to" value="" aria-label="종료일">
+  <button class="btn" type="submit">검색</button>
+  
+</form>
+
+<form method="post" action="#" data-orig-action="/admin/orders/bulk" data-bulk-form>
+  <input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th class="check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>
+        <th>유튜브 닉네임 / 받는 분</th><th>상품 (개봉/미개봉)</th><th class="right">결제금액</th><th>결제·배송</th><th>상태</th><th>주문시각</th><th>처리</th>
+      </tr></thead>
+      <tbody>
+      
+      
+        <tr class="row">
+          <td class="check"><input type="checkbox" name="ids" value="7" data-check aria-label="선택"></td>
+          <td>
+            <a class="nick" href="admin-order.html">깅모지러버</a>
+            <span class="nick-sub">김시청 · 010-1111-2222</span>
+            
+          </td>
+          <td class="items">
+            <div>베이비쓰리 테니베어 400 ×1 <span class="opt">(개봉 1 / 미개봉 0)</span></div><div>젤리캣 바쉬풀 버니 M ×1</div>
+          </td>
+          <td class="right"><div class="amount num">95,000원</div></td>
+          <td><span class="chip bank">계좌이체</span><br><span class="chip direct" style="margin-top:4px">바로배송</span></td>
+          <td><span class="chip pending">입금대기</span></td>
+          <td class="num muted nowrap">2026.10.07 14:34</td>
+          <td>
+            <div class="actions">
+              
+                <button class="btn sm ok" type="submit"  data-orig-action="/admin/orders/7/confirm" data-confirm="깅모지러버님 95,000원 입금 확인할까요?">입금 확인</button>
+              
+              
+              
+            </div>
+          </td>
+        </tr>
+      
+        <tr class="row">
+          <td class="check"><input type="checkbox" name="ids" value="6" data-check aria-label="선택"></td>
+          <td>
+            <a class="nick" href="admin-order.html">깅모지러버</a>
+            <span class="nick-sub">김시청 · 010-1111-2222</span>
+            
+          </td>
+          <td class="items">
+            <div>산리오 랜덤 키링 ×2</div>
+          </td>
+          <td class="right"><div class="amount num">24,000원</div></td>
+          <td><span class="chip bank">계좌이체</span><br><span class="chip keep" style="margin-top:4px">킵</span></td>
+          <td><span class="chip kept">킵보관</span></td>
+          <td class="num muted nowrap">2026.10.07 14:34</td>
+          <td>
+            <div class="actions">
+              
+              
+              
+            </div>
+          </td>
+        </tr>
+      
+        <tr class="row">
+          <td class="check"><input type="checkbox" name="ids" value="5" data-check aria-label="선택"></td>
+          <td>
+            <a class="nick" href="admin-order.html">깅모지러버</a>
+            <span class="nick-sub">김시청 · 010-1111-2222</span>
+            
+          </td>
+          <td class="items">
+            <div>포켓몬 랜덤 블라인드 박스 ×2 <span class="opt">(개봉 1 / 미개봉 1)</span></div>
+          </td>
+          <td class="right"><div class="amount num">30,000원</div></td>
+          <td><span class="chip bank">계좌이체</span><br><span class="chip keep" style="margin-top:4px">킵</span></td>
+          <td><span class="chip kept">킵보관</span></td>
+          <td class="num muted nowrap">2026.10.07 14:34</td>
+          <td>
+            <div class="actions">
+              
+              
+              
+            </div>
+          </td>
+        </tr>
+      
+        <tr class="row">
+          <td class="check"><input type="checkbox" name="ids" value="4" data-check aria-label="선택"></td>
+          <td>
+            <a class="nick" href="admin-order.html">깅모지러버</a>
+            <span class="nick-sub">김시청 · 010-1111-2222</span>
+            
+          </td>
+          <td class="items">
+            <div>포켓몬 랜덤 블라인드 박스 ×2 <span class="opt">(개봉 1 / 미개봉 1)</span></div>
+          </td>
+          <td class="right"><div class="amount num">34,000원</div><div class="muted num" style="font-size:12px">배송비 4,000</div></td>
+          <td><span class="chip bank">계좌이체</span><br><span class="chip direct" style="margin-top:4px">바로배송</span></td>
+          <td><span class="chip paid">결제완료</span></td>
+          <td class="num muted nowrap">2026.10.07 11:30</td>
+          <td>
+            <div class="actions">
+              
+              <button class="btn sm soft" type="submit"  data-orig-action="/admin/orders/4/status" name="status" value="preparing">배송준비</button>
+              <a class="btn sm ghost" href="admin-order.html">송장</a>
+            </div>
+          </td>
+        </tr>
+      
+        <tr class="row">
+          <td class="check"><input type="checkbox" name="ids" value="2" data-check aria-label="선택"></td>
+          <td>
+            <a class="nick" href="admin-order.html">깅모지러버</a>
+            <span class="nick-sub">김시청 · 010-1111-2222</span>
+            
+          </td>
+          <td class="items">
+            <div>산리오 랜덤 키링 ×3</div>
+          </td>
+          <td class="right"><div class="amount num">36,000원</div></td>
+          <td><span class="chip bank">계좌이체</span><br><span class="chip keep" style="margin-top:4px">킵</span></td>
+          <td><span class="chip shipped">발송완료</span><div class="muted" style="font-size:12px;margin-top:4px">CJ대한통운 555566667777</div></td>
+          <td class="num muted nowrap">2026.10.07 11:28</td>
+          <td>
+            <div class="actions">
+              
+              
+              
+            </div>
+          </td>
+        </tr>
+      
+        <tr class="row">
+          <td class="check"><input type="checkbox" name="ids" value="1" data-check aria-label="선택"></td>
+          <td>
+            <a class="nick" href="admin-order.html">깅모지러버</a>
+            <span class="nick-sub">김시청 · 010-1111-2222</span>
+            
+          </td>
+          <td class="items">
+            <div>베이비쓰리 테니베어 400 ×2 <span class="opt">(개봉 1 / 미개봉 1)</span></div>
+          </td>
+          <td class="right"><div class="amount num">78,000원</div><div class="muted num" style="font-size:12px">배송비 4,000</div></td>
+          <td><span class="chip bank">계좌이체</span><br><span class="chip direct" style="margin-top:4px">바로배송</span></td>
+          <td><span class="chip paid">결제완료</span></td>
+          <td class="num muted nowrap">2026.10.07 11:28</td>
+          <td>
+            <div class="actions">
+              
+              <button class="btn sm soft" type="submit"  data-orig-action="/admin/orders/1/status" name="status" value="preparing">배송준비</button>
+              <a class="btn sm ghost" href="admin-order.html">송장</a>
+            </div>
+          </td>
+        </tr>
+      
+      </tbody>
+    </table>
+  </div>
+  <div class="bulk">
+    <span class="sel">선택 <b data-sel-count>0</b>건</span>
+    <button class="btn sm ok" type="submit" name="action" value="confirm" data-need-sel>입금 확인</button>
+    <button class="btn sm pink" type="submit" name="action" value="preparing" data-need-sel>배송준비</button>
+    <button class="btn sm pink" type="submit" name="action" value="shipped" data-need-sel>발송완료</button>
+    <button class="btn sm danger" type="submit" name="action" value="cancel" data-need-sel data-confirm="선택한 주문을 취소할까요? 재고가 되돌아가고 포인트가 회수됩니다">취소</button>
+    <span class="muted" style="margin-left:auto;font-size:12.5px">총 6건</span>
+  </div>
+</form>
+
+
+
+  </main>
+</div>
+<script src="static/js/admin.js"></script>
+</body>
+</html>
+

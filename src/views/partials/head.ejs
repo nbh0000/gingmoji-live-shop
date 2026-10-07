@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#141011">
+<title><%= typeof title !== 'undefined' && title ? title + ' · ' : '' %>깅모지 LIVE</title>
+<meta name="description" content="깅모지 유튜브 라이브 방송 전용 주문 사이트">
+<meta property="og:title" content="깅모지 LIVE 주문">
+<meta property="og:image" content="/static/img/logo-wide.jpg">
+<link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/static/css/shop.css?v=1">
+<meta name="csrf" content="<%= csrf %>">
+</head>
+<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="/" aria-label="깅모지 홈"><span class="g">깅</span>모지<span class="q">?</span></a>
+    <div class="top-actions">
+      <span class="live-pill <%= s.live_on ? 'on' : '' %>" data-live-pill><%= s.live_on ? 'LIVE' : 'OFF' %></span>
+      <a class="icon-btn" href="<%= user ? '/my' : '/login' %>" aria-label="<%= user ? '마이페이지' : '로그인' %>">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20c1.4-3.6 4.2-5.2 7.5-5.2s6.1 1.6 7.5 5.2"/></svg>
+      </a>
+      <button class="icon-btn" type="button" data-open-cart aria-label="장바구니">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 10.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>
+        <span class="badge" data-cart-count hidden>0</span>
+      </button>
+    </div>
+  </div>
+</header>
+<% if (flash) { %><div class="toast show <%= flash.type === 'error' ? 'error' : '' %>" data-flash role="status"><%= flash.message %></div><% } %>

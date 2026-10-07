@@ -1,0 +1,24 @@
+{
+  "name": "gingmoji-live-shop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "깅모지 유튜브 라이브 방송 전용 주문 사이트",
+  "main": "web.js",
+  "scripts": {
+    "start": "node web.js",
+    "dev": "node --watch web.js",
+    "migrate": "node src/migrate.js",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.6",
+    "ejs": "^7.0.1",
+    "express": "^4.22.3",
+    "express-session": "^1.19.0",
+    "multer": "^2.4.0",
+    "mysql2": "^3.24.5"
+  }
+}

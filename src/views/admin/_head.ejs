@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141011">
+<meta name="robots" content="noindex">
+<title><%= title %> · 깅모지 관리자</title>
+<link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="/static/css/admin.css?v=1">
+<meta name="csrf" content="<%= csrf %>">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="logo" href="/admin"><span class="g">깅</span>모지<small>ADMIN</small></a>
+    <nav class="nav">
+      <% var nc = typeof navCounts !== 'undefined' ? navCounts : {}; %>
+      <a href="/admin" class="<%= path === '/' ? 'on' : '' %>"><span><span class="dot <%= s.live_on ? 'on' : '' %>"></span>대시보드</span></a>
+      <a href="/admin/orders" class="<%= path.indexOf('/orders') === 0 ? 'on' : '' %>"><span>주문 관리</span><% if (nc.bank) { %><span class="cnt" title="입금 대기"><%= nc.bank %></span><% } %></a>
+      <a href="/admin/keep" class="<%= path.indexOf('/keep') === 0 || path.indexOf('/shipments') === 0 ? 'on' : '' %>"><span>킵 관리</span><% if (nc.ship) { %><span class="cnt" title="출고 요청"><%= nc.ship %></span><% } %></a>
+      <a href="/admin/products" class="<%= path.indexOf('/products') === 0 ? 'on' : '' %>"><span>상품·재고</span></a>
+      <a href="/admin/users" class="<%= path.indexOf('/users') === 0 ? 'on' : '' %>"><span>회원</span></a>
+      <a href="/admin/settings" class="<%= path.indexOf('/settings') === 0 ? 'on' : '' %>"><span>설정</span></a>
+      <a href="/admin/pages" class="<%= path.indexOf('/pages') === 0 ? 'on' : '' %>"><span>약관·정책</span></a>
+    </nav>
+    <div class="side-foot">
+      <a href="/" target="_blank">고객 화면 열기 ↗</a>
+      <form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn sm ghost" type="submit">로그아웃</button></form>
+    </div>
+  </aside>
+  <main class="main">
+  <% if (flash) { %><div class="flash <%= flash.type === 'error' ? 'error' : '' %>" role="status"><%= flash.message %></div><% } %>

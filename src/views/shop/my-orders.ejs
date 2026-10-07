@@ -1,0 +1,15 @@
+<%- include('../partials/head', { title: '주문 내역', bodyClass: '' }) %>
+<main class="wrap page">
+  <div class="page-title"><a class="back" href="/my" aria-label="뒤로">←</a>주문 내역</div>
+  <% if (!list.length) { %><div class="empty"><div class="big">?</div><p>아직 주문이 없어요</p><a class="btn" href="/">쇼핑하러 가기</a></div><% } %>
+  <div class="list">
+  <% list.forEach(function (o) { %>
+    <a class="item" href="/orders/<%= o.order_no %>">
+      <div class="top-row"><span class="meta num"><%= fmt.dt(o.created_at) %> · <%= o.order_no %></span><%- include('../partials/order-chip', { o: o }) %></div>
+      <div class="title"><%= o.items.length ? o.items[0].product_name + (o.items.length > 1 ? ' 외 ' + (o.items.length - 1) + '건' : '') : '' %></div>
+      <div class="top-row"><span class="num" style="font-weight:800"><%= fmt.won(o.total_amount) %></span><span class="meta"><%= o.delivery_type === 'keep' ? '킵' : '바로배송' %> · <%= o.payment_method === 'card' ? '카드' : '계좌이체' %></span></div>
+    </a>
+  <% }) %>
+  </div>
+</main>
+<%- include('../partials/foot') %>

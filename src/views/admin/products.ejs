@@ -1,0 +1,30 @@
+<%- include('_head') %>
+<div class="page-head">
+  <h1>상품·재고</h1>
+  <a class="btn pink lg" href="/admin/products/new">+ 상품 등록</a>
+</div>
+<p class="muted" style="margin:-6px 0 12px">≡ 를 끌어서 노출 순서를 바꿀 수 있어요. 재고는 숫자를 바꾸면 바로 저장돼요. "결제 대기"는 아직 결제 전이지만 재고를 잡고 있는 수량이에요.</p>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th></th><th>상품</th><th class="right">가격</th><th>재고</th><th>결제 대기</th><th>개봉 옵션</th><th>노출</th><th>품절</th><th></th></tr></thead>
+    <tbody data-sortable>
+    <% if (!list.length) { %><tr><td colspan="9" class="empty">등록된 상품이 없어요. 첫 상품을 등록해 보세요.</td></tr><% } %>
+    <% list.forEach(function (p) { %>
+      <tr class="row" data-id="<%= p.id %>">
+        <td><span class="drag" aria-label="순서 이동" title="끌어서 순서 변경">≡</span></td>
+        <td><div style="display:flex;gap:10px;align-items:center">
+          <% if (p.image_id) { %><img class="pthumb" src="/img/<%= p.image_id %>" alt=""><% } else { %><span class="pthumb">?</span><% } %>
+          <a class="pname" href="/admin/products/<%= p.id %>"><%= p.name %></a></div></td>
+        <td class="right num"><%= fmt.won(p.price) %></td>
+        <td><input class="stock-input num" type="number" min="0" value="<%= p.stock %>" data-quick="<%= p.id %>" data-field="stock" aria-label="재고"></td>
+        <td class="num muted"><%= p.reserved_qty ? p.reserved_qty + '개' : '-' %></td>
+        <td><%= p.use_open_option ? '사용' : '-' %></td>
+        <td><label class="switch"><input type="checkbox" <%= p.is_visible ? 'checked' : '' %> data-quick="<%= p.id %>" data-field="is_visible" aria-label="노출"></label></td>
+        <td><label class="switch"><input type="checkbox" <%= p.is_soldout ? 'checked' : '' %> data-quick="<%= p.id %>" data-field="is_soldout" aria-label="품절"></label></td>
+        <td><a class="btn sm ghost" href="/admin/products/<%= p.id %>">수정</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>
+<%- include('_foot') %>

@@ -1,0 +1,77 @@
+<%- include('../partials/head', { title: '주문하기', bodyClass: '' }) %>
+<main class="wrap page">
+  <div class="page-title"><a class="back" href="/" aria-label="뒤로">←</a>주문하기</div>
+
+  <div class="banner off" data-not-live <%= s.live_on ? 'hidden' : '' %>><span class="heart">✦</span><span>방송이 끝나 지금은 주문할 수 없어요</span></div>
+
+  <section class="panel">
+    <h2>주문 상품 <a class="link side" href="#" data-open-cart>수정</a></h2>
+    <div data-co-lines><p class="hint">불러오는 중…</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>배송방식</h2>
+    <div class="choices">
+      <label class="choice"><input type="radio" name="delivery" value="direct" checked>
+        <span class="tile"><span class="t">📦 바로배송</span><span class="d"><%= fmt.won(s.free_shipping_threshold) %> 이상 무료<br>미만 배송비 <%= fmt.won(s.shipping_fee) %></span></span></label>
+      <label class="choice"><input type="radio" name="delivery" value="keep">
+        <span class="tile"><span class="t">🧸 킵하기</span><span class="d">지금은 배송비 없이 보관<br>모아서 한 번에 출고</span></span></label>
+    </div>
+    <p class="hint" data-free-hint style="margin:10px 0 0" hidden></p>
+  </section>
+
+  <section class="panel">
+    <h2>받는 분 <button type="button" class="link side" style="border:0;background:none;cursor:pointer;font:inherit;font-size:13px" data-edit-addr>변경</button></h2>
+    <div class="addr-view" data-addr-view>
+      <div class="who"><%= user.name %> · <%= fmt.phone(user.phone) %></div>
+      <div><%= user.zipcode ? '(' + user.zipcode + ') ' : '' %><%= user.address1 %> <%= user.address2 %></div>
+      <div class="muted">유튜브 닉네임 <b><%= user.youtube_nickname %></b></div>
+    </div>
+    <div data-addr-form hidden style="margin-top:6px">
+      <label class="field"><span>받는 분</span><input name="name" value="<%= user.name %>" maxlength="50" autocomplete="name"></label>
+      <label class="field"><span>휴대폰</span><input name="phone" value="<%= user.phone %>" type="tel" inputmode="numeric" maxlength="13" autocomplete="tel"></label>
+      <div class="field"><span>주소</span>
+        <div class="field-row"><input name="zipcode" value="<%= user.zipcode || '' %>" readonly placeholder="우편번호" style="max-width:130px" data-zip><button type="button" class="btn soft grow" data-postcode>주소 찾기</button></div>
+        <input name="address1" value="<%= user.address1 %>" readonly data-addr1>
+        <input name="address2" value="<%= user.address2 || '' %>" maxlength="255" placeholder="상세주소" data-addr2>
+      </div>
+      <label class="check"><input type="checkbox" name="saveAddress" value="1"> 이 주소를 기본 배송지로 저장</label>
+    </div>
+    <label class="field" style="margin:12px 0 0"><span>배송 메모 (선택)</span><input name="memo" maxlength="255" placeholder="예: 문 앞에 놓아 주세요"></label>
+  </section>
+
+  <section class="panel">
+    <h2>결제수단</h2>
+    <div class="choices">
+      <label class="choice"><input type="radio" name="payment" value="bank" <%= config.portone.enabled ? '' : 'checked' %>>
+        <span class="tile"><span class="t">🏦 계좌이체</span><span class="d"><%= s.bank_name %> 입금<% if (s.point_earn_rate) { %><br>포인트 <%= s.point_earn_rate %>% 적립<% } %></span></span></label>
+      <label class="choice"><input type="radio" name="payment" value="card" <%= config.portone.enabled ? 'checked' : 'disabled' %>>
+        <span class="tile"><span class="t">💳 카드결제</span><span class="d"><%= config.portone.enabled ? '바로 결제 완료' : '준비 중이에요' %></span></span></label>
+    </div>
+    <label class="field" data-depositor style="margin:12px 0 0" <%= config.portone.enabled ? 'hidden' : '' %>><span>입금자명</span><input name="depositorName" value="<%= user.name %>" maxlength="50"></label>
+  </section>
+
+  <% if (s.point_use_enabled) { %>
+  <section class="panel" data-point-panel>
+    <h2>포인트 <span class="side" style="color:var(--muted)">보유 <b class="num" style="color:var(--ink)"><%= fmt.num(user.point_balance) %>P</b></span></h2>
+    <div class="field-row">
+      <input class="input grow num" name="pointUse" inputmode="numeric" placeholder="0" data-point-input>
+      <button type="button" class="btn soft" data-point-max>최대 사용</button>
+    </div>
+    <p class="hint" style="margin:8px 0 0" data-point-hint></p>
+  </section>
+  <% } %>
+
+  <section class="panel">
+    <h2>결제 금액</h2>
+    <div class="sum-row"><span class="k">상품금액</span><span class="num" data-sum-items>-</span></div>
+    <div class="sum-row"><span class="k">배송비</span><span class="num" data-sum-ship>-</span></div>
+    <div class="sum-row" data-sum-point-row hidden><span class="k">포인트 사용</span><span class="num minus" data-sum-point>-</span></div>
+    <div class="sum-row total"><span>총 결제금액</span><span class="v num" data-sum-total>-</span></div>
+  </section>
+
+  <p style="color:var(--muted);font-size:12.5px;margin:0 6px 4px">주문 내용을 확인했으며 <a class="link" href="/page/terms" target="_blank">이용약관</a>, <a class="link" href="/page/refund" target="_blank">교환·환불 정책</a>에 동의합니다.</p>
+  <div class="paybar"><button class="btn big block" type="button" data-place-order disabled>결제하기</button></div>
+</main>
+<%- include('../partials/postcode') %>
+<%- include('../partials/foot', { scripts: config.portone.enabled ? ['https://cdn.portone.io/v2/browser-sdk.js', '/static/js/pay.js?v=1', '/static/js/checkout.js?v=1'] : ['/static/js/pay.js?v=1', '/static/js/checkout.js?v=1'] }) %>

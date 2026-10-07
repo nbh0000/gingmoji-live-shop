@@ -1,0 +1,87 @@
+<%- include('_head') %>
+<%
+  var qs = function (over) {
+    var o = Object.assign({}, q, over || {});
+    return Object.keys(o).filter(function (k) { return o[k] !== '' && o[k] !== undefined; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&');
+  };
+  var tabs = [['', '전체(취소 제외)'], ['bank_pending', '입금대기'], ['card_pending', '결제대기'], ['paid', '결제완료'], ['preparing', '배송준비'], ['shipped', '발송완료'], ['kept', '킵보관'], ['cancelled', '취소']];
+%>
+<div class="page-head">
+  <h1>주문 관리</h1>
+  <div class="actions">
+    <a class="btn ghost" href="/admin/orders?<%= qs({ auto: auto ? '' : '1' }) %>"><%= auto ? '⏸ 자동 새로고침 끄기' : '↻ 10초 자동 새로고침' %></a>
+    <a class="btn" href="/admin/orders/export.csv?<%= qs({ auto: '' }) %>">엑셀(CSV) 다운로드</a>
+  </div>
+</div>
+
+<nav class="seg">
+  <% tabs.forEach(function (t) { %><a class="<%= q.status === t[0] ? 'on' : '' %>" href="/admin/orders?<%= qs({ status: t[0], page: '' }) %>"><%= t[1] %></a><% }) %>
+</nav>
+
+<form class="filters" method="get" action="/admin/orders">
+  <input type="hidden" name="status" value="<%= q.status %>">
+  <% if (auto) { %><input type="hidden" name="auto" value="1"><% } %>
+  <input type="search" name="q" value="<%= q.q %>" placeholder="유튜브 닉네임, 이름, 주문번호, 입금자명, 연락처">
+  <select name="method"><option value="">결제수단 전체</option><option value="bank" <%= q.method === 'bank' ? 'selected' : '' %>>계좌이체</option><option value="card" <%= q.method === 'card' ? 'selected' : '' %>>카드결제</option></select>
+  <select name="delivery"><option value="">배송방식 전체</option><option value="direct" <%= q.delivery === 'direct' ? 'selected' : '' %>>바로배송</option><option value="keep" <%= q.delivery === 'keep' ? 'selected' : '' %>>킵</option></select>
+  <input type="date" name="from" value="<%= q.from %>" aria-label="시작일"><input type="date" name="to" value="<%= q.to %>" aria-label="종료일">
+  <button class="btn" type="submit">검색</button>
+  <% if (q.q || q.method || q.delivery || q.from || q.to) { %><a class="btn ghost" href="/admin/orders?status=<%= q.status %>">초기화</a><% } %>
+</form>
+
+<form method="post" action="/admin/orders/bulk" data-bulk-form>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th class="check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>
+        <th>유튜브 닉네임 / 받는 분</th><th>상품 (<%= fmt.OPT.short.opened %>/<%= fmt.OPT.short.unopened %>)</th><th class="right">결제금액</th><th>결제·배송</th><th>상태</th><th>주문시각</th><th>처리</th>
+      </tr></thead>
+      <tbody>
+      <% if (!list.length) { %><tr><td colspan="8" class="empty">조건에 맞는 주문이 없어요</td></tr><% } %>
+      <% list.forEach(function (o) { %>
+        <tr class="row">
+          <td class="check"><input type="checkbox" name="ids" value="<%= o.id %>" data-check aria-label="선택"></td>
+          <td>
+            <a class="nick" href="/admin/orders/<%= o.id %>"><%= o.youtube_nickname || o.user_nick || '-' %></a>
+            <span class="nick-sub"><%= o.recipient_name %> · <%= fmt.phone(o.recipient_phone) %></span>
+            <% if (o.payment_method === 'bank' && o.depositor_name && o.depositor_name !== o.recipient_name) { %><div class="nick-sub">입금자 <b><%= o.depositor_name %></b></div><% } %>
+          </td>
+          <td class="items">
+            <% o.items.forEach(function (it) { %><div><%= it.product_name %> ×<%= it.qty %><% if (it.qty_opened || it.qty_unopened) { %> <span class="opt">(<%= fmt.OPT.short.opened %> <%= it.qty_opened %> / <%= fmt.OPT.short.unopened %> <%= it.qty_unopened %>)</span><% } %></div><% }) %>
+          </td>
+          <td class="right"><div class="amount num"><%= fmt.won(o.total_amount) %></div><% if (o.shipping_fee) { %><div class="muted num" style="font-size:12px">배송비 <%= fmt.num(o.shipping_fee) %></div><% } %><% if (o.point_used) { %><div class="muted num" style="font-size:12px">포인트 -<%= fmt.num(o.point_used) %></div><% } %></td>
+          <td><span class="chip <%= o.payment_method %>"><%= L.payment[o.payment_method] %></span><br><span class="chip <%= o.delivery_type %>" style="margin-top:4px"><%= L.delivery[o.delivery_type] %></span></td>
+          <td><span class="chip <%= o.status %>"><%= orderStatus(o) %></span><% if (o.tracking_no) { %><div class="muted" style="font-size:12px;margin-top:4px"><%= o.courier %> <%= o.tracking_no %></div><% } %></td>
+          <td class="num muted nowrap"><%= fmt.dt(o.created_at) %></td>
+          <td>
+            <div class="actions">
+              <% if (o.status === 'pending' && o.payment_method === 'bank') { %>
+                <button class="btn sm ok" type="submit" formaction="/admin/orders/<%= o.id %>/confirm" data-confirm="<%= o.youtube_nickname %>님 <%= fmt.won(o.total_amount) %> 입금 확인할까요?">입금 확인</button>
+              <% } %>
+              <% if (o.status === 'paid') { %><button class="btn sm soft" type="submit" formaction="/admin/orders/<%= o.id %>/status" name="status" value="preparing">배송준비</button><% } %>
+              <% if (o.status === 'paid' || o.status === 'preparing') { if (!o.shipment_request_id) { %><a class="btn sm ghost" href="/admin/orders/<%= o.id %>#tracking">송장</a><% } } %>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div class="bulk">
+    <span class="sel">선택 <b data-sel-count>0</b>건</span>
+    <button class="btn sm ok" type="submit" name="action" value="confirm" data-need-sel>입금 확인</button>
+    <button class="btn sm pink" type="submit" name="action" value="preparing" data-need-sel>배송준비</button>
+    <button class="btn sm pink" type="submit" name="action" value="shipped" data-need-sel>발송완료</button>
+    <button class="btn sm danger" type="submit" name="action" value="cancel" data-need-sel data-confirm="선택한 주문을 취소할까요? 재고가 되돌아가고 포인트가 회수됩니다">취소</button>
+    <span class="muted" style="margin-left:auto;font-size:12.5px">총 <%= fmt.num(total) %>건</span>
+  </div>
+</form>
+
+<% if (pages > 1) { %>
+<nav class="pager">
+  <% for (var i = 1; i <= pages; i++) { if (i === page) { %><span><%= i %></span><% } else if (i === 1 || i === pages || Math.abs(i - page) <= 2) { %><a href="/admin/orders?<%= qs({ page: i }) %>"><%= i %></a><% } } %>
+</nav>
+<% } %>
+<% if (auto) { %><script>window.ADMIN_AUTO_REFRESH = 10000;</script><% } %>
+<%- include('_foot') %>

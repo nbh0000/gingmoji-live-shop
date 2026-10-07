@@ -1,0 +1,25 @@
+<footer class="foot">
+  <div class="wrap">
+    <div class="brand"><span class="g">깅</span>모지</div>
+    <nav class="foot-links">
+      <a href="/page/terms">이용약관</a>
+      <a href="/page/privacy" class="strong">개인정보처리방침</a>
+      <a href="/page/refund">교환·환불 정책</a>
+    </nav>
+    <div class="biz">
+      <span>상호 <%= s.biz_name %></span><span>대표자 <%= s.biz_owner %></span><br>
+      <span>사업자등록번호 <%= s.biz_reg_no %></span><br>
+      <span>통신판매업 신고번호 <%= s.biz_mail_order_no %></span><br>
+      <span>사업장 주소 <%= s.biz_address %></span><br>
+      <span>연락처 <%= s.biz_phone %></span><span>이메일 <%= s.biz_email %></span>
+    </div>
+    <div style="margin-top:10px">© <%= new Date().getFullYear() %> <%= s.biz_name %>. All rights reserved.</div>
+  </div>
+</footer>
+<%- include('cart-sheet') %>
+<script>window.GM = { live: <%= s.live_on ? 'true' : 'false' %>, showPrice: <%= (s.live_on || s.always_show_price) ? 'true' : 'false' %>, loggedIn: <%= user ? 'true' : 'false' %>, opt: { opened: '<%= fmt.OPT.opened %>', unopened: '<%= fmt.OPT.unopened %>' }, card: <%= config.portone.enabled ? 'true' : 'false' %>, freeShip: <%= Number(s.free_shipping_threshold) %>, shipFee: <%= Number(s.shipping_fee) %> };</script>
+<script src="/static/js/shop.js?v=1"></script>
+<% if (typeof scripts !== 'undefined') { scripts.forEach(function (src) { %><script src="<%= src %>"></script>
+<% }) } %>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<%- include('../partials/head', { title: '마이페이지', bodyClass: '' }) %>
+<% var pct = box.threshold ? Math.min(100, Math.round(box.keptAmount / box.threshold * 100)) : 0; %>
+<main class="wrap page">
+  <section class="panel dark">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div>
+        <div style="font-family:var(--f-display);font-size:26px;color:var(--pink)"><%= user.youtube_nickname %></div>
+        <div style="color:#b9a9ab;font-size:14px"><%= user.name %> · <%= fmt.phone(user.phone) %></div>
+      </div>
+      <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn small" style="background:var(--night-2)">로그아웃</button></form>
+    </div>
+  </section>
+
+  <a class="panel" href="/my/keep" style="display:block;text-decoration:none">
+    <h2>킵 보관함 <span class="side link">출고 요청 →</span></h2>
+    <div class="keep-meter">
+      <div class="keep-amount num"><%= fmt.won(box.keptAmount) %> <span style="font-family:var(--f-body);font-size:13px;color:var(--muted)"><%= box.orders.length %>건 보관 중</span></div>
+      <div class="meter" role="progressbar" aria-valuenow="<%= pct %>" aria-valuemin="0" aria-valuemax="100"><i style="width:<%= pct %>%"></i></div>
+      <div class="keep-left"><% if (!box.orders.length) { %>보관 중인 상품이 없어요<% } else if (box.remaining > 0) { %>무료배송까지 <b class="num"><%= fmt.won(box.remaining) %></b><% } else { %><b>무료배송으로 출고할 수 있어요 ♥</b><% } %></div>
+    </div>
+  </a>
+  <% if (pendingShip) { %>
+  <a class="panel tint" href="/my/shipments/<%= pendingShip.request_no %>" style="display:block;text-decoration:none">
+    <h2 style="margin:0">배송비 <%= fmt.won(pendingShip.shipping_fee) %> 결제를 기다리고 있어요 <span class="side link">결제하기 →</span></h2>
+  </a>
+  <% } %>
+
+  <div class="menu" style="margin-bottom:14px">
+    <a href="/my/orders">주문 내역<small>최근 주문과 입금 상태</small></a>
+    <a href="/my/points">포인트<span class="v num"><%= fmt.num(user.point_balance) %>P</span></a>
+    <a href="/my/profile">회원 정보<small>배송지·닉네임 수정</small></a>
+    <a href="/">쇼핑하기<small>라이브 상품 보러 가기</small></a>
+  </div>
+
+  <section class="panel">
+    <h2>최근 주문 <a class="link side" href="/my/orders">전체 보기</a></h2>
+    <% if (!recent.length) { %><p class="hint" style="margin:0">아직 주문이 없어요</p><% } %>
+    <div class="list">
+    <% recent.forEach(function (o) { %>
+      <a class="item" href="/orders/<%= o.order_no %>" style="box-shadow:none;background:#faf5f3">
+        <div class="top-row"><span class="meta num"><%= fmt.dt(o.created_at) %></span><%- include('../partials/order-chip', { o: o }) %></div>
+        <div class="top-row"><span class="title num"><%= fmt.won(o.total_amount) %></span><span class="meta"><%= o.delivery_type === 'keep' ? '킵' : '바로배송' %> · <%= o.payment_method === 'card' ? '카드' : '계좌이체' %></span></div>
+      </a>
+    <% }) %>
+    </div>
+  </section>
+</main>
+<%- include('../partials/foot') %>

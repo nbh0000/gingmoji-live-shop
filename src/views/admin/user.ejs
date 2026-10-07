@@ -1,0 +1,67 @@
+<%- include('_head') %>
+<div class="page-head"><h1><a href="/admin/users" class="muted" style="text-decoration:none">←</a> 회원 정보</h1></div>
+<div class="two">
+  <div class="grid">
+    <section class="card">
+      <div class="nick" style="font-size:32px"><%= u.youtube_nickname || '(정보 미입력)' %></div>
+      <dl class="kv" style="margin-top:12px">
+        <dt>이름</dt><dd><%= u.name || '-' %></dd>
+        <dt>휴대폰</dt><dd class="num"><%= fmt.phone(u.phone) || '-' %></dd>
+        <dt>주소</dt><dd><%= u.zipcode ? '(' + u.zipcode + ') ' : '' %><%= u.address1 || '-' %> <%= u.address2 || '' %></dd>
+        <dt>로그인</dt><dd><%= u.login_id ? '아이디 ' + u.login_id : '' %><%= u.kakao_id ? ' 카카오' : '' %><%= u.google_id ? ' 구글' : '' %></dd>
+        <dt>이메일</dt><dd><%= u.email || '-' %></dd>
+        <dt>가입일</dt><dd class="num"><%= fmt.dt(u.created_at) %></dd>
+        <dt>킵 보관</dt><dd><a href="/admin/keep/user/<%= u.id %>"><%= fmt.won(box.keptAmount) %> (<%= box.orders.length %>건)</a></dd>
+      </dl>
+    </section>
+    <section class="card">
+      <h2>관리자 메모</h2>
+      <form method="post" action="/admin/users/<%= u.id %>/memo">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="field"><textarea name="admin_memo"><%= u.admin_memo || '' %></textarea></label>
+        <button class="btn sm" type="submit" style="margin-top:8px">저장</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>최근 주문</h2>
+      <table>
+        <tbody>
+        <% if (!ordersList.length) { %><tr><td class="empty">주문이 없어요</td></tr><% } %>
+        <% ordersList.forEach(function (o) { %>
+          <tr><td><a class="num" href="/admin/orders/<%= o.id %>"><%= o.order_no %></a><div class="muted num" style="font-size:12px"><%= fmt.dt(o.created_at) %></div></td>
+          <td><span class="chip <%= o.payment_method %>"><%= L.payment[o.payment_method] %></span> <span class="chip <%= o.delivery_type %>"><%= L.delivery[o.delivery_type] %></span></td>
+          <td class="right num"><%= fmt.won(o.total_amount) %></td><td><span class="chip <%= o.status %>"><%= orderStatus(o) %></span></td></tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </section>
+  </div>
+  <div class="grid">
+    <section class="card">
+      <h2>포인트 <span class="num" style="font-family:var(--f-display);font-size:26px;color:var(--pink-dd)"><%= fmt.num(u.point_balance) %>P</span></h2>
+      <form method="post" action="/admin/users/<%= u.id %>/points" class="form-grid">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="field"><span>구분</span><select name="mode"><option value="add">지급</option><option value="sub">차감</option></select></label>
+        <label class="field"><span>포인트</span><input name="amount" inputmode="numeric" required></label>
+        <label class="field full"><span>사유 (회원에게 보여요)</span><input name="memo" maxlength="200" placeholder="예: 방송 이벤트 당첨"></label>
+        <div class="full"><button class="btn" type="submit">적용</button></div>
+      </form>
+    </section>
+    <section class="card">
+      <h2>포인트 내역</h2>
+      <table>
+        <thead><tr><th>일시</th><th>구분</th><th class="right">포인트</th><th class="right">잔액</th></tr></thead>
+        <tbody>
+        <% if (!ledger.length) { %><tr><td colspan="4" class="empty">내역이 없어요</td></tr><% } %>
+        <% ledger.forEach(function (l) { %>
+          <tr><td class="num muted nowrap"><%= fmt.dt(l.created_at) %></td>
+          <td><%= L.point[l.type] || l.type %><div class="muted" style="font-size:12px"><%= l.order_no || '' %> <%= l.memo || '' %></div></td>
+          <td class="right num" style="font-weight:700;color:<%= l.amount > 0 ? 'var(--pink-dd)' : 'inherit' %>"><%= l.amount > 0 ? '+' : '' %><%= fmt.num(l.amount) %></td>
+          <td class="right num muted"><%= fmt.num(l.balance_after) %></td></tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>
+<%- include('_foot') %>

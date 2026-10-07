@@ -1,0 +1,10 @@
+<%- include('../partials/head', { title: title, bodyClass: '' }) %>
+<main class="wrap page">
+  <div class="panel" style="text-align:center;padding:36px 20px">
+    <div style="font-family:var(--f-display);font-size:48px;color:var(--pink)">?</div>
+    <h1 style="font-family:var(--f-display);font-weight:400;font-size:26px;margin:6px 0"><%= title %></h1>
+    <p style="color:var(--muted)"><%= message %></p>
+    <a class="btn block" href="<%= link || '/' %>" style="margin-top:12px">돌아가기</a>
+  </div>
+</main>
+<%- include('../partials/foot') %>

@@ -1,0 +1,8 @@
+<%- include('../partials/head', { title: page.title, bodyClass: '' }) %>
+<main class="wrap page">
+  <div class="page-title"><a class="back" href="/" aria-label="홈으로">←</a><%= page.title %></div>
+  <article class="panel policy"><%- fmt.policy(page.content, s) %>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:20px">최종 수정 <%= fmt.date(page.updated_at) %></p>
+  </article>
+</main>
+<%- include('../partials/foot') %>

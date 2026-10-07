@@ -1,0 +1,4 @@
+<%
+  var _l = o.status === 'pending' ? (o.payment_method === 'card' ? '결제대기' : '입금대기') : ({ paid: '결제완료', kept: '킵보관', preparing: '배송준비', shipped: '발송완료', cancelled: '취소' })[o.status];
+  var _c = { pending: 'warn', paid: 'ok', kept: '', preparing: 'ok', shipped: 'dark', cancelled: 'gray' }[o.status];
+%><span class="chip <%= _c %>"><%= _l %></span>

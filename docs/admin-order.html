@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141011">
+<meta name="robots" content="noindex">
+<title>주문 G261007-17462 · 깅모지 관리자</title>
+<link rel="icon" href="static/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="static/css/admin.css">
+<meta name="csrf" content="tzytsDLk7T8Cgn3jwr73ZsfB">
+<script src="static/js/demo-data.js"></script>
+<script src="static/js/demo-map.js"></script>
+<script src="static/js/demo.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="logo" href="admin.html"><span class="g">깅</span>모지<small>ADMIN</small></a>
+    <nav class="nav">
+      
+      <a href="admin.html" class=""><span><span class="dot on"></span>대시보드</span></a>
+      <a href="admin-orders.html" class="on"><span>주문 관리</span><span class="cnt" title="입금 대기">1</span></a>
+      <a href="admin-keep.html" class=""><span>킵 관리</span></a>
+      <a href="admin-products.html" class=""><span>상품·재고</span></a>
+      <a href="admin-users.html" class=""><span>회원</span></a>
+      <a href="admin-settings.html" class=""><span>설정</span></a>
+      <a href="admin-pages.html" class=""><span>약관·정책</span></a>
+    </nav>
+    <div class="side-foot">
+      <a href="index.html" target="_blank">고객 화면 열기 ↗</a>
+      <form method="post" action="#" data-orig-action="/admin/logout"><input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB"><button class="btn sm ghost" type="submit">로그아웃</button></form>
+    </div>
+  </aside>
+  <main class="main">
+  
+
+<div class="page-head">
+  <h1><a href="admin-orders.html" class="muted" style="text-decoration:none">←</a> 주문 상세</h1>
+  <span class="chip pending" style="font-size:14px;padding:4px 14px">입금대기</span>
+</div>
+
+<div class="two">
+  <div class="grid">
+    <section class="card">
+      <div class="nick" style="font-size:32px">깅모지러버</div>
+      <div class="muted">G261007-17462 · 2026.10.07 14:34</div>
+      <dl class="kv" style="margin-top:14px">
+        <dt>결제수단</dt><dd><span class="chip bank">계좌이체</span></dd>
+        <dt>배송방식</dt><dd><span class="chip direct">바로배송</span></dd>
+        <dt>입금자명</dt><dd>김시청</dd>
+        
+        <dt>재고 선점 만료</dt><dd class="num">2026.10.08 14:34</dd>
+        
+        
+      </dl>
+      <div class="actions" style="margin-top:16px">
+        
+          <form method="post" action="#" data-orig-action="/admin/orders/7/confirm" class="inline"><input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB"><button class="btn lg ok" data-confirm="95,000원 입금을 확인할까요?">입금 확인</button></form>
+        
+        
+        
+          <form method="post" action="#" data-orig-action="/admin/orders/7/cancel" class="inline"><input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB"><button class="btn danger" data-confirm="이 주문을 취소할까요? 재고가 되돌아가고 포인트가 정리됩니다">주문 취소</button></form>
+        
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>상품</h2>
+      <table>
+        <thead><tr><th>상품</th><th class="right">수량</th><th class="right">라이브 개봉</th><th class="right">미개봉 발송</th><th class="right">금액</th></tr></thead>
+        <tbody>
+        <tr><td>베이비쓰리 테니베어 400<div class="muted num" style="font-size:12px">37,000원</div></td><td class="right num">1</td><td class="right num">1</td><td class="right num">-</td><td class="right num">37,000원</td></tr><tr><td>젤리캣 바쉬풀 버니 M<div class="muted num" style="font-size:12px">58,000원</div></td><td class="right num">1</td><td class="right num">-</td><td class="right num">-</td><td class="right num">58,000원</td></tr>
+        </tbody>
+      </table>
+      <dl class="kv" style="margin-top:12px">
+        <dt>상품금액</dt><dd class="num right">95,000원</dd>
+        <dt>배송비</dt><dd class="num right">0원</dd>
+        
+        <dt><b>결제금액</b></dt><dd class="num right" style="font-size:18px;font-weight:800">95,000원</dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>받는 분 <a class="btn sm ghost" href="admin-user.html">회원 정보</a></h2>
+      <dl class="kv">
+        <dt>이름</dt><dd>김시청</dd>
+        <dt>연락처</dt><dd>010-1111-2222</dd>
+        <dt>주소</dt><dd>(06000) 서울 서초구 방배천로2길 21 101호</dd>
+        <dt>배송 메모</dt><dd>-</dd>
+        <dt>회원</dt><dd>김시청 · live_fan1</dd>
+      </dl>
+    </section>
+
+    
+    <section class="card" id="tracking">
+      <h2>송장</h2>
+      <form method="post" action="#" data-orig-action="/admin/orders/7/tracking" class="form-grid">
+        <input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB">
+        <label class="field"><span>택배사</span><input name="courier" value="CJ대한통운" list="couriers"></label>
+        <label class="field"><span>송장번호</span><input name="tracking_no" value="" inputmode="numeric"></label>
+        <label class="switch full"><input type="checkbox" name="mark_shipped" value="1" checked> 저장하면서 발송완료로 변경</label>
+        <div class="full"><button class="btn" type="submit">송장 저장</button></div>
+      </form>
+      <datalist id="couriers"><option>CJ대한통운</option><option>우체국택배</option><option>한진택배</option><option>롯데택배</option><option>로젠택배</option><option>GS25 반값택배</option><option>CU 알뜰택배</option></datalist>
+    </section>
+    
+
+    <section class="card">
+      <h2>관리자 메모</h2>
+      <form method="post" action="#" data-orig-action="/admin/orders/7/memo">
+        <input type="hidden" name="_csrf" value="tzytsDLk7T8Cgn3jwr73ZsfB">
+        <label class="field"><textarea name="admin_memo" placeholder="고객에게 보이지 않아요"></textarea></label>
+        <button class="btn sm" type="submit" style="margin-top:8px">메모 저장</button>
+      </form>
+    </section>
+
+    
+  </div>
+</div>
+  </main>
+</div>
+<script src="static/js/admin.js"></script>
+</body>
+</html>
+
