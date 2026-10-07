@@ -3,10 +3,13 @@ const { PolicyError } = require('./pricing');
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
+// 상품 구분 (홈 화면 구역)
+const SECTIONS = { live: '라이브 상품', sample: '샘플' };
+
 /** 고객 화면용 목록 (첫 이미지 id 포함) */
 async function listForShop() {
   return db.query(
-    `SELECT p.id, p.name, p.description, p.price, p.stock, p.use_open_option, p.is_soldout, p.sort_order,
+    `SELECT p.id, p.name, p.description, p.section, p.price, p.stock, p.use_open_option, p.is_soldout, p.sort_order,
             (SELECT i.id FROM product_images i WHERE i.product_id = p.id ORDER BY i.sort_order, i.id LIMIT 1) AS image_id
        FROM products p
       WHERE p.deleted_at IS NULL AND p.is_visible = 1
@@ -44,6 +47,7 @@ function clean(input) {
     description: String(input.description || '').slice(0, 20000),
     price: Math.max(0, int(input.price)),
     stock: Math.max(0, int(input.stock)),
+    section: SECTIONS[input.section] ? input.section : 'live',
     use_open_option: bool(input.use_open_option) ? 1 : 0,
     is_visible: bool(input.is_visible) ? 1 : 0,
     is_soldout: bool(input.is_soldout) ? 1 : 0,
@@ -56,9 +60,9 @@ async function create(input) {
   const p = clean(input);
   const [[mx]] = await db.pool.query('SELECT COALESCE(MAX(sort_order), 0) AS m FROM products WHERE deleted_at IS NULL');
   const [r] = await db.pool.query(
-    `INSERT INTO products (name, description, price, stock, use_open_option, is_visible, is_soldout, sort_order)
-     VALUES (?,?,?,?,?,?,?,?)`,
-    [p.name, p.description, p.price, p.stock, p.use_open_option, p.is_visible, p.is_soldout, mx.m + 10]
+    `INSERT INTO products (name, description, section, price, stock, use_open_option, is_visible, is_soldout, sort_order)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [p.name, p.description, p.section, p.price, p.stock, p.use_open_option, p.is_visible, p.is_soldout, mx.m + 10]
   );
   return r.insertId;
 }
@@ -66,8 +70,8 @@ async function create(input) {
 async function update(id, input) {
   const p = clean(input);
   await db.query(
-    `UPDATE products SET name=?, description=?, price=?, stock=?, use_open_option=?, is_visible=?, is_soldout=? WHERE id=? AND deleted_at IS NULL`,
-    [p.name, p.description, p.price, p.stock, p.use_open_option, p.is_visible, p.is_soldout, id]
+    `UPDATE products SET name=?, description=?, section=?, price=?, stock=?, use_open_option=?, is_visible=?, is_soldout=? WHERE id=? AND deleted_at IS NULL`,
+    [p.name, p.description, p.section, p.price, p.stock, p.use_open_option, p.is_visible, p.is_soldout, id]
   );
 }
 
@@ -119,4 +123,4 @@ async function getImage(imageId) {
   return db.one('SELECT id, mime, data FROM product_images WHERE id = ?', [imageId]);
 }
 
-module.exports = { listForShop, listForAdmin, get, create, update, setStock, setFlag, remove, reorder, addImage, removeImage, makeImageFirst, getImage };
+module.exports = { SECTIONS, listForShop, listForAdmin, get, create, update, setStock, setFlag, remove, reorder, addImage, removeImage, makeImageFirst, getImage };

@@ -372,7 +372,7 @@ router.get('/products', wrap(async (req, res) => {
 }));
 
 router.get('/products/new', (req, res) => {
-  res.render('admin/product-form', { title: '상품 등록', p: { use_open_option: 1, is_visible: 1, is_soldout: 0, images: [] }, isNew: true });
+  res.render('admin/product-form', { title: '상품 등록', p: { section: req.query.section === 'sample' ? 'sample' : 'live', use_open_option: 1, is_visible: 1, is_soldout: 0, images: [] }, isNew: true });
 });
 
 router.post('/products/new', upload.array('images', 10), wrap(async (req, res) => {

@@ -6,15 +6,16 @@
 <p class="muted" style="margin:-6px 0 12px">≡ 를 끌어서 노출 순서를 바꿀 수 있어요. 재고는 숫자를 바꾸면 바로 저장돼요. "결제 대기"는 아직 결제 전이지만 재고를 잡고 있는 수량이에요.</p>
 <div class="table-wrap">
   <table>
-    <thead><tr><th></th><th>상품</th><th class="right">가격</th><th>재고</th><th>결제 대기</th><th>개봉 옵션</th><th>노출</th><th>품절</th><th></th></tr></thead>
+    <thead><tr><th></th><th>상품</th><th>구분</th><th class="right">가격</th><th>재고</th><th>결제 대기</th><th>개봉 옵션</th><th>노출</th><th>품절</th><th></th></tr></thead>
     <tbody data-sortable>
-    <% if (!list.length) { %><tr><td colspan="9" class="empty">등록된 상품이 없어요. 첫 상품을 등록해 보세요.</td></tr><% } %>
+    <% if (!list.length) { %><tr><td colspan="10" class="empty">등록된 상품이 없어요. 첫 상품을 등록해 보세요.</td></tr><% } %>
     <% list.forEach(function (p) { %>
       <tr class="row" data-id="<%= p.id %>">
         <td><span class="drag" aria-label="순서 이동" title="끌어서 순서 변경">≡</span></td>
         <td><div style="display:flex;gap:10px;align-items:center">
           <% if (p.image_id) { %><img class="pthumb" src="/img/<%= p.image_id %>" alt=""><% } else { %><span class="pthumb">?</span><% } %>
           <a class="pname" href="/admin/products/<%= p.id %>"><%= p.name %></a></div></td>
+        <td><span class="chip <%= p.section === 'sample' ? 'kept' : '' %>"><%= p.section === 'sample' ? '샘플' : '라이브' %></span></td>
         <td class="right num"><%= fmt.won(p.price) %></td>
         <td><input class="stock-input num" type="number" min="0" value="<%= p.stock %>" data-quick="<%= p.id %>" data-field="stock" aria-label="재고"></td>
         <td class="num muted"><%= p.reserved_qty ? p.reserved_qty + '개' : '-' %></td>

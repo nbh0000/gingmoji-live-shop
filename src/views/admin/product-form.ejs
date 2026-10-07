@@ -5,6 +5,7 @@
   <section class="card">
     <div class="form-grid">
       <label class="field full"><span>상품명</span><input name="name" value="<%= p.name || '' %>" required maxlength="200"></label>
+      <label class="field full"><span>구분 (홈 화면 구역)</span><select name="section"><option value="live" <%= p.section !== 'sample' ? 'selected' : '' %>>라이브 상품</option><option value="sample" <%= p.section === 'sample' ? 'selected' : '' %>>샘플</option></select></label>
       <label class="field"><span>가격 (원)</span><input name="price" type="number" min="0" step="100" value="<%= p.price || '' %>" required inputmode="numeric"></label>
       <label class="field"><span>재고</span><input name="stock" type="number" min="0" value="<%= p.stock || 0 %>" required inputmode="numeric"></label>
       <label class="field full"><span>상품 설명</span><textarea name="description" placeholder="구성, 크기, 주의사항 등 (PG 심사 시 상품정보로 확인됩니다)"><%= p.description || '' %></textarea></label>
