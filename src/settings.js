@@ -11,7 +11,7 @@ const DEFAULTS = {
   // ===== 입금 계좌 =====
   bank_name: '케이뱅크',
   bank_account: '100301443318',
-  bank_holder: '김민정(깅모지)',
+  bank_holder: '김민정(김모지)',
 
   // ===== 결제 대기 / 재고 선점 =====
   card_hold_minutes: 10, // 카드 미결제 시 재고 자동 해제(분)

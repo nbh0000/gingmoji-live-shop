@@ -372,6 +372,11 @@ input, textarea, select { font-size: 16px; font-family: inherit; color: inherit;
 .bank-card .k { color: #b9a9ab; font-size: 13px; }
 .bank-card .v { font-weight: 800; font-size: 17px; }
 .bank-card .amount { font-family: var(--f-display); font-weight: 400; color: var(--pink); font-size: 30px; }
+.bank-mini { background: var(--night); color: var(--cream); border-radius: var(--r-lg); padding: 14px 16px; }
+.bank-mini-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.bank-mini .k { color: #b9a9ab; font-size: 12.5px; }
+.bank-mini .k b { color: var(--cream); }
+.bank-mini .v { font-weight: 800; font-size: 17px; margin: 2px 0; }
 .copy { border: 0; background: var(--night-2); color: var(--pink); border-radius: var(--r-pill); padding: 7px 13px; font-weight: 700; font-size: 13px; cursor: pointer; }
 .copy:active { transform: scale(0.95); }
 

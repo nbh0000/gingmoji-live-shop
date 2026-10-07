@@ -51,7 +51,7 @@
         <label class="choice"><input type="radio" name="payment" value="bank" <%= config.portone.enabled ? '' : 'checked' %>><span class="tile"><span class="t">🏦 계좌이체</span><span class="d"><%= s.bank_name %> 입금</span></span></label>
         <label class="choice"><input type="radio" name="payment" value="card" <%= config.portone.enabled ? 'checked' : 'disabled' %>><span class="tile"><span class="t">💳 카드결제</span><span class="d"><%= config.portone.enabled ? '바로 결제' : '준비 중이에요' %></span></span></label>
       </div>
-      <label class="field" data-depositor style="margin-top:12px" <%= config.portone.enabled ? 'hidden' : '' %>><span>입금자명</span><input name="depositorName" value="<%= user.name %>" maxlength="50"></label>
+      <%- include('../partials/bank-box', { amountText: '배송비 ' + fmt.won(box.fee) + '을 위 계좌로 입금해 주세요. 입금이 확인되면 출고 요청이 접수돼요.' }) %>
     <% } %>
     <button class="btn big block pink" type="button" data-release-go style="margin-top:8px"><%= box.fee > 0 ? '배송비 ' + fmt.won(box.fee) + ' 결제하고 출고 요청' : '무료배송으로 출고 요청' %></button>
   </section>

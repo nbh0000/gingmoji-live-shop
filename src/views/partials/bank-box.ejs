@@ -1,0 +1,15 @@
+<%# 계좌이체 선택 시 보이는 입금 계좌 안내 + 입금자명 (data-depositor 묶음으로 함께 숨김/표시) %>
+<div data-depositor style="margin-top:12px" <%= config.portone.enabled ? 'hidden' : '' %>>
+  <div class="bank-mini">
+    <div class="bank-mini-row">
+      <div>
+        <div class="k">입금 계좌</div>
+        <div class="v num"><%= s.bank_name %> <%= s.bank_account %></div>
+        <div class="k">예금주 <b><%= s.bank_holder %></b></div>
+      </div>
+      <button class="copy" type="button" data-copy="<%= s.bank_account %>">계좌 복사</button>
+    </div>
+    <div class="k" style="margin-top:6px"><%= typeof amountText !== 'undefined' ? amountText : '주문 후 안내되는 금액을 위 계좌로 입금해 주세요.' %></div>
+  </div>
+  <label class="field" style="margin:12px 0 0"><span>입금자명</span><input name="depositorName" value="<%= user.name %>" maxlength="50"></label>
+</div>

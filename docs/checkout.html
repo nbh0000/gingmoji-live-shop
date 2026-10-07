@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="static/css/shop.css">
-<meta name="csrf" content="QkUlLJxC0sFCC6nAe3qbulrl">
+<meta name="csrf" content="DEYJfrxzf84eS9jsDo97Kot9">
 <script src="static/js/demo-data.js"></script>
 <script src="static/js/demo-map.js"></script>
 <script src="static/js/demo.js"></script>
@@ -86,7 +86,22 @@
       <label class="choice"><input type="radio" name="payment" value="card" disabled>
         <span class="tile"><span class="t">💳 카드결제</span><span class="d">준비 중이에요</span></span></label>
     </div>
-    <label class="field" data-depositor style="margin:12px 0 0" ><span>입금자명</span><input name="depositorName" value="김시청" maxlength="50"></label>
+    
+<div data-depositor style="margin-top:12px" >
+  <div class="bank-mini">
+    <div class="bank-mini-row">
+      <div>
+        <div class="k">입금 계좌</div>
+        <div class="v num">케이뱅크 100301443318</div>
+        <div class="k">예금주 <b>김민정(김모지)</b></div>
+      </div>
+      <button class="copy" type="button" data-copy="100301443318">계좌 복사</button>
+    </div>
+    <div class="k" style="margin-top:6px">주문하면 입금하실 금액이 안내돼요. 입금이 확인되면 결제완료로 바뀌어요.</div>
+  </div>
+  <label class="field" style="margin:12px 0 0"><span>입금자명</span><input name="depositorName" value="김시청" maxlength="50"></label>
+</div>
+
   </section>
 
   

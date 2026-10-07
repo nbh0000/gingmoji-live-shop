@@ -48,7 +48,7 @@
       <label class="choice"><input type="radio" name="payment" value="card" <%= config.portone.enabled ? 'checked' : 'disabled' %>>
         <span class="tile"><span class="t">💳 카드결제</span><span class="d"><%= config.portone.enabled ? '바로 결제 완료' : '준비 중이에요' %></span></span></label>
     </div>
-    <label class="field" data-depositor style="margin:12px 0 0" <%= config.portone.enabled ? 'hidden' : '' %>><span>입금자명</span><input name="depositorName" value="<%= user.name %>" maxlength="50"></label>
+    <%- include('../partials/bank-box', { amountText: '주문하면 입금하실 금액이 안내돼요. 입금이 확인되면 결제완료로 바뀌어요.' }) %>
   </section>
 
   <% if (s.point_use_enabled) { %>
