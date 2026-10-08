@@ -35,7 +35,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php3' : '/static/css/shop.css?v=php5';
+    $css = $admin ? '/static/css/admin.css?v=php3' : '/static/css/shop.css?v=php6';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -126,6 +126,11 @@ function handle_shop(string $path): never
         if (!$gallery) {
             $gallery = '<div class="thumb"><span class="ph">이미지 없음</span></div>';
         }
+        $detailImages = '';
+        foreach ($product['images'] as $image) {
+            $detailImages .= '<img class="detail-image" src="/img/' . (int)$image['id'] . '" alt="' . e($product['name']) . ' 상세 이미지" loading="lazy">';
+        }
+        $detailImages = $detailImages ? '<div class="detail-images" aria-label="상품 상세 이미지">' . $detailImages . '</div>' : '';
         $body = '<main class="detail-page"><div class="detail-breadcrumb"><a href="/">HOME</a><span>/</span><span>' . e($product['name']) . '</span></div><div class="detail-layout"><section class="detail-media"><div class="p-gallery detail-gallery">' . $gallery . '</div></section><section class="detail-info"><p class="detail-kicker">GINGMOJI COLLECTION</p><h1 class="p-name">' . e($product['name']) . '</h1><div class="' . ($showPrice ? 'p-price' : 'price hidden') . '">' . ($showPrice ? won($product['price']) : '가격은 방송 중 공개됩니다') . '</div><div class="p-meta">';
         if ((int)$product['is_soldout'] || (int)$product['stock'] <= 0) {
             $body .= '<span class="chip gray">품절</span>';
@@ -142,7 +147,7 @@ function handle_shop(string $path): never
         } else {
             $optionHtml = '<div class="detail-field"><span>수량</span><div class="detail-qty"><button type="button" id="detailMinus" aria-label="수량 줄이기">−</button><input id="detailQty" type="number" min="1" max="' . max(1, (int)$product['stock']) . '" value="1"><button type="button" id="detailPlus" aria-label="수량 늘리기">+</button></div></div>';
         }
-        $body .= '<div class="detail-option-box">' . $optionHtml . '</div><div class="detail-total"><span>TOTAL</span><strong id="detailTotal">' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</strong></div><div class="detail-actions"><button class="detail-wish" type="button" aria-label="찜하기">♡</button><button class="btn big block" type="button" id="detailAdd">장바구니 담기</button></div></section></div><nav class="detail-tabs" aria-label="상품 상세 메뉴"><a class="on" href="#detail-description">DETAIL</a><a href="#detail-guide">GUIDE</a><a href="#detail-review">REVIEW (0)</a><a href="#detail-qna">Q&A (0)</a></nav><section class="detail-description" id="detail-description"><h2>상품 상세정보</h2>' . ($product['description'] ? '<div class="p-desc">' . nl2br(e($product['description'])) . '</div>' : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>') . '</section><section class="detail-description detail-guide" id="detail-guide"><h2>구매 안내</h2><p>방송 상품은 방송 중 주문할 수 있습니다. 상품별 옵션과 배송 안내를 확인해 주세요.</p></section></main>';
+        $body .= '<div class="detail-option-box">' . $optionHtml . '</div><div class="detail-total"><span>TOTAL</span><strong id="detailTotal">' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</strong></div><div class="detail-actions"><button class="detail-wish" type="button" aria-label="찜하기">♡</button><button class="btn big block" type="button" id="detailAdd">장바구니 담기</button></div></section></div><nav class="detail-tabs" aria-label="상품 상세 메뉴"><a class="on" href="#detail-description">DETAIL</a></nav><section class="detail-description" id="detail-description"><h2>상품 상세정보</h2>' . ($product['description'] ? '<div class="p-desc">' . nl2br(e($product['description'])) . '</div>' : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>') . $detailImages . '</section></main>';
         $detailId = (int)$product['id'];
         $detailName = json_encode($product['name'], JSON_UNESCAPED_UNICODE);
         $detailImage = !empty($product['images'][0]['id']) ? (int)$product['images'][0]['id'] : 'null';
