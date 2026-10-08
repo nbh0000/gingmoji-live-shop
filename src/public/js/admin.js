@@ -38,6 +38,15 @@
     input.addEventListener('change', function () { previewImageFiles(input); });
   });
 
+  $$('input[data-package-toggle]').forEach(function (toggle) {
+    var fields = $$('input[data-package-price]').map(function (input) { return input.closest('.field'); }).filter(Boolean);
+    var syncPackageFields = function () {
+      fields.forEach(function (field) { field.hidden = !toggle.checked; });
+    };
+    toggle.addEventListener('change', syncPackageFields);
+    syncPackageFields();
+  });
+
   $$('[data-close-admin-modal]').forEach(function (button) {
     button.addEventListener('click', function () {
       var modal = button.closest('[data-admin-modal]');
