@@ -7,6 +7,49 @@
   var won = function (n) { return Number(n || 0).toLocaleString('ko-KR') + '원'; };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
 
+  function previewImageFiles(input) {
+    var role = input.getAttribute('data-image-upload');
+    var box = $('[data-upload-preview="' + role + '"]');
+    if (!box) return;
+    var files = Array.prototype.slice.call(input.files || []);
+    if (role === 'main') files = files.slice(0, 1);
+    box.innerHTML = '';
+    if (!files.length) {
+      box.innerHTML = '<p class="upload-empty">선택된 이미지가 없습니다.</p>';
+      return;
+    }
+    files.forEach(function (file) {
+      if (!/^image\//.test(file.type)) return;
+      var figure = document.createElement('figure');
+      figure.className = 'upload-preview-card' + (role === 'main' ? ' main' : '');
+      var image = document.createElement('img');
+      image.alt = file.name;
+      image.src = URL.createObjectURL(file);
+      image.onload = function () { URL.revokeObjectURL(image.src); };
+      var caption = document.createElement('figcaption');
+      caption.textContent = role === 'main' ? '새 메인 이미지' : file.name;
+      figure.appendChild(image);
+      figure.appendChild(caption);
+      box.appendChild(figure);
+    });
+  }
+
+  $$('[data-image-upload]').forEach(function (input) {
+    input.addEventListener('change', function () { previewImageFiles(input); });
+  });
+
+  $$('[data-close-admin-modal]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var modal = button.closest('[data-admin-modal]');
+      if (modal) modal.remove();
+    });
+  });
+  $$('[data-admin-modal]').forEach(function (modal) {
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal) modal.remove();
+    });
+  });
+
   function post(url, data) {
     var body = new URLSearchParams(data);
     return fetch(url, { method: 'POST', headers: { 'x-csrf-token': csrf, Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: body, credentials: 'same-origin' })
