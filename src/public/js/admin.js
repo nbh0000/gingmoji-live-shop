@@ -7,21 +7,46 @@
   var won = function (n) { return Number(n || 0).toLocaleString('ko-KR') + '원'; };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
 
+  function fileKey(file) {
+    return [file.name, file.size, file.lastModified].join(':');
+  }
+
+  function syncFileInput(input, files) {
+    if (typeof DataTransfer === 'undefined') return;
+    var transfer = new DataTransfer();
+    files.forEach(function (file) { transfer.items.add(file); });
+    input.files = transfer.files;
+  }
+
   function previewImageFiles(input) {
     var role = input.getAttribute('data-image-upload');
     var box = $('[data-upload-preview="' + role + '"]');
     if (!box) return;
-    var files = Array.prototype.slice.call(input.files || []);
-    if (role === 'main') files = files.slice(0, 1);
-    box.innerHTML = '';
-    if (!files.length) {
+    var incoming = Array.prototype.slice.call(input.files || []);
+    var files = role === 'main' ? incoming.slice(0, 1) : (input._selectedFiles || []).concat(incoming);
+    var seen = {};
+    files = files.filter(function (file) {
+      var key = fileKey(file);
+      if (seen[key]) return false;
+      seen[key] = true;
+      return /^image\//.test(file.type);
+    });
+    input._selectedFiles = files;
+    syncFileInput(input, files);
+
+    if (role === 'main') {
+      box.innerHTML = '';
+    } else {
+      $$('[data-new-upload]', box).forEach(function (figure) { figure.remove(); });
+    }
+    if (!files.length && role === 'main') {
       box.innerHTML = '<p class="upload-empty">선택된 이미지가 없습니다.</p>';
       return;
     }
     files.forEach(function (file) {
-      if (!/^image\//.test(file.type)) return;
       var figure = document.createElement('figure');
       figure.className = 'upload-preview-card' + (role === 'main' ? ' main' : '');
+      figure.setAttribute('data-new-upload', '1');
       var image = document.createElement('img');
       image.alt = file.name;
       image.src = URL.createObjectURL(file);
