@@ -492,7 +492,8 @@ function render_signup(): never
         }
     }
     $body = '<main class="wrap page"><div class="panel auth"><h1>회원가입</h1><p class="hint">아이디는 영문·숫자·밑줄(_) 4~50자, 비밀번호는 8자 이상 입력해 주세요. 카카오·구글 가입은 OAuth 키를 받은 뒤 연결합니다.</p><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><label class="field"><span>아이디</span><input name="login_id" pattern="[A-Za-z0-9_]{4,50}" title="영문, 숫자, 밑줄(_)을 사용해 4~50자로 입력해 주세요." autocomplete="username" required></label><label class="field"><span>비밀번호</span><input name="password" type="password" minlength="8" autocomplete="new-password" required></label><label class="field"><span>성함</span><input name="name" required></label><label class="field"><span>휴대폰</span><input name="phone" required></label><label class="field"><span>유튜브 닉네임</span><input name="youtube_nickname" required></label><label class="field"><span>주소</span><input name="zipcode"><input name="address1" placeholder="주소"><input name="address2" placeholder="상세주소"></label><button class="btn big block">가입하기</button></form></div></main>';
-    page('회원가입', $body);
+    $body = str_replace('<label class="field"><span>주소</span><input name="zipcode"><input name="address1" placeholder="주소"><input name="address2" placeholder="상세주소"></label>', '<label class="field address-field"><span>주소</span><div class="field-row address-search-row"><input class="grow" name="zipcode" data-signup-zipcode placeholder="우편번호" readonly><button type="button" class="btn small ghost" data-address-search>주소 검색</button></div><input name="address1" data-signup-address placeholder="주소 검색으로 입력" readonly><input name="address2" placeholder="상세주소" autocomplete="street-address"></label>', $body);
+    page('회원가입', $body, false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1']);
 }
 
 function render_checkout(): never
