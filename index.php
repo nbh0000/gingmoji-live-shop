@@ -162,7 +162,7 @@ function handle_shop(string $path): never
         } else {
             $optionHtml = '<div class="detail-field"><span>수량</span><div class="detail-qty"><button type="button" id="detailMinus" aria-label="수량 줄이기">−</button><input id="detailQty" type="number" min="1" max="' . max(1, (int)$product['stock']) . '" value="1"><button type="button" id="detailPlus" aria-label="수량 늘리기">+</button></div></div>';
         }
-        $body .= '<div class="detail-option-box">' . $optionHtml . '</div><div class="detail-total"><span>TOTAL</span><strong id="detailTotal">' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</strong></div><div class="detail-actions"><button class="btn big block" type="button" id="detailAdd">장바구니 담기</button></div></section></div><nav class="detail-tabs" aria-label="상품 상세 메뉴"><a class="on" href="#detail-description">DETAIL</a></nav><section class="detail-description" id="detail-description"><h2>상품 상세정보</h2>' . $detailImages . ($product['description'] ? '<div class="p-desc detail-description-text">' . nl2br(e($product['description'])) . '</div>' : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>') . '</section></main>';
+        $body .= '<div class="detail-option-box">' . $optionHtml . '</div><div class="detail-total"><span>TOTAL</span><strong id="detailTotal">' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</strong></div><div class="detail-actions"><button class="btn big soft" type="button" id="detailCartAdd">장바구니 담기</button><button class="btn big" type="button" id="detailBuyNow">바로 구매</button></div></section></div><nav class="detail-tabs" aria-label="상품 상세 메뉴"><a class="on" href="#detail-description">DETAIL</a></nav><section class="detail-description" id="detail-description"><h2>상품 상세정보</h2>' . $detailImages . ($product['description'] ? '<div class="p-desc detail-description-text">' . nl2br(e($product['description'])) . '</div>' : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>') . '</section></main>';
         $detailId = (int)$product['id'];
         $detailName = json_encode($product['name'], JSON_UNESCAPED_UNICODE);
         $detailImage = !empty($product['images'][0]['id']) ? (int)$product['images'][0]['id'] : 'null';
@@ -172,8 +172,9 @@ function handle_shop(string $path): never
         $detailScript = <<<'HTML'
 <script>
 (function () {
-  var add = document.getElementById('detailAdd');
-  if (!add) return;
+  var cartAdd = document.getElementById('detailCartAdd');
+  var buyNow = document.getElementById('detailBuyNow');
+  if (!cartAdd || !buyNow) return;
   var price = __PRICE__;
   var max = __MAX__;
   var live = __LIVE__;
@@ -201,8 +202,10 @@ function handle_shop(string $path): never
       document.getElementById('detailPlus').disabled = qty >= max;
     }
     total.textContent = ((packagePrices[packageType] || price) * count).toLocaleString('ko-KR') + '원';
-    add.disabled = !live || count < 1;
-    add.textContent = !live ? '방송 중에만 구매 가능' : (count ? count + '개 담기' : '수량을 골라 주세요');
+    cartAdd.disabled = !live || count < 1;
+    buyNow.disabled = !live || count < 1;
+    cartAdd.textContent = !live ? '방송 중에만 구매 가능' : (count ? '장바구니 담기' : '수량을 골라 주세요');
+    buyNow.textContent = !live ? '방송 중에만 구매 가능' : (count ? '바로 구매' : '수량을 골라 주세요');
   }
   function change(kind, delta) {
     if (kind === 'opened') opened = Math.max(0, Math.min(max - unopened, opened + delta));
@@ -224,28 +227,74 @@ function handle_shop(string $path): never
     document.getElementById('detailPlus').addEventListener('click', function () { qty = Math.min(max, qty + 1); sync(); });
     document.getElementById('detailQty').addEventListener('input', function () { qty = Math.max(1, Math.min(max, parseInt(this.value || '1', 10) || 1)); sync(); });
   }
-  add.addEventListener('click', function () {
+  function flyToCart(source) {
+    var target = document.querySelector('[data-open-cart]');
+    if (!target) return;
+    var from = source.getBoundingClientRect();
+    var to = target.getBoundingClientRect();
+    var fly = document.createElement('span');
+    var startX = from.left + from.width / 2 - 14;
+    var startY = from.top + from.height / 2 - 14;
+    fly.className = 'cart-fly';
+    fly.textContent = '+';
+    fly.style.left = startX + 'px';
+    fly.style.top = startY + 'px';
+    fly.style.setProperty('--fly-x', (to.left + to.width / 2 - 14 - startX) + 'px');
+    fly.style.setProperty('--fly-y', (to.top + to.height / 2 - 14 - startY) + 'px');
+    document.body.appendChild(fly);
+    requestAnimationFrame(function () { fly.classList.add('is-flying'); });
+    setTimeout(function () { fly.remove(); }, 700);
+  }
+
+  function makeLine() {
+    var line = { productId: __ID__, name: __NAME__, price: packagePrices[packageType] || price, packageType: packageType, imageId: __IMAGE__, option: hasOption, opened: 0, unopened: 0, qty: 0 };
+    if (hasOption) {
+      line.opened = opened;
+      line.unopened = unopened;
+    } else {
+      line.qty = qty;
+    }
+    return line;
+  }
+
+  function addToCart(redirect, source) {
     if (!live) return;
     var count = hasOption ? opened + unopened : qty;
     if (!count) return;
     var cart = [];
     try { cart = JSON.parse(localStorage.getItem('gm_cart_v1')) || []; } catch (e) {}
-    var line = cart.find(function (item) { return Number(item.productId) === __ID__ && (item.packageType || 'standard') === packageType; });
-    if (!line) {
-      line = { productId: __ID__, name: __NAME__, price: packagePrices[packageType] || price, packageType: packageType, imageId: __IMAGE__, option: hasOption, opened: 0, unopened: 0, qty: 0 };
-      cart.push(line);
-    }
-    line.price = packagePrices[packageType] || price;
-    line.packageType = packageType;
-    if (hasOption) {
-      line.opened = (line.opened || 0) + opened;
-      line.unopened = (line.unopened || 0) + unopened;
+    var line = makeLine();
+    if (redirect) {
+      cart = [line];
     } else {
-      line.qty = (line.qty || 0) + qty;
+      var existing = cart.find(function (item) { return Number(item.productId) === __ID__ && (item.packageType || 'standard') === packageType; });
+      if (existing) {
+        existing.price = line.price;
+        existing.name = line.name;
+        existing.imageId = line.imageId;
+        if (hasOption) {
+          existing.opened = (existing.opened || 0) + line.opened;
+          existing.unopened = (existing.unopened || 0) + line.unopened;
+        } else {
+          existing.qty = (existing.qty || 0) + line.qty;
+        }
+      } else {
+        cart.push(line);
+      }
     }
     localStorage.setItem('gm_cart_v1', JSON.stringify(cart));
-    location.href = '/checkout';
-  });
+    document.dispatchEvent(new CustomEvent('gm:cart-updated'));
+    if (redirect) {
+      location.href = '/checkout';
+      return;
+    }
+    flyToCart(source || cartAdd);
+    cartAdd.textContent = '장바구니에 담았어요';
+    setTimeout(sync, 1400);
+  }
+
+  cartAdd.addEventListener('click', function () { addToCart(false, cartAdd); });
+  buyNow.addEventListener('click', function () { addToCart(true, buyNow); });
   sync();
 })();
 </script>

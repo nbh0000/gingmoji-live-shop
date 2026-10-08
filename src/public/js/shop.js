@@ -84,6 +84,7 @@
   }
 
   // ===== 바텀시트 =====
+  document.addEventListener('gm:cart-updated', renderBadge);
   var backdrop = $('[data-backdrop]');
   var openSheetEl = null;
   function openSheet(el) {
