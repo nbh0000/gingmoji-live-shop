@@ -29,15 +29,20 @@ if (str_starts_with($path, '/admin')) {
 }
 handle_shop($path);
 
-function page(string $title, string $body, bool $admin = false, array $scripts = []): never
+function page(string $title, string $body, bool $admin = false, array $scripts = [], bool $shell = true): never
 {
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php2' : '/static/css/shop.css?v=php2';
+    $css = $admin ? '/static/css/admin.css?v=php3' : '/static/css/shop.css?v=php3';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
+    }
+
+    if ($admin && !$shell) {
+        echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . e($title) . ' · 깅모지 관리자</title><link rel="stylesheet" href="' . $css . '"></head><body>' . $body . '</body></html>';
+        exit;
     }
 
     if ($admin) {
@@ -448,7 +453,7 @@ function handle_admin(string $path): never
             }
             flash('error', '관리자 아이디 또는 비밀번호가 올바르지 않습니다.');
         }
-        page('관리자 로그인', '<main class="login"><div class="card"><h1>깅모지 관리자</h1><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><label class="field"><span>아이디</span><input name="admin_id" required></label><label class="field"><span>비밀번호</span><input type="password" name="admin_password" required></label><button class="btn">로그인</button></form></div></main>', true);
+        page('관리자 로그인', '<main class="login-wrap"><div class="login-card"><a class="logo" href="/admin/login">깅모지<small>ADMIN</small></a><h1>관리자 로그인</h1><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><label class="field"><span>아이디</span><input name="admin_id" required autocomplete="username"></label><label class="field"><span>비밀번호</span><input type="password" name="admin_password" required autocomplete="current-password"></label><button class="btn block">로그인</button></form></div></main>', true, [], false);
     }
     if ($path === '/admin/logout') {
         unset($_SESSION['is_admin']);

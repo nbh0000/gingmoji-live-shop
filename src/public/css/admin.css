@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css');
+
 /* 깅모지 관리자 — 고객 화면과 같은 톤(블랙/핑크/크림)에 정보 밀도를 높인 운영 화면 */
 :root {
   --night: #141011;
@@ -191,7 +194,7 @@ tr.dragging td { background: var(--pink-ll); }
 .empty { text-align: center; color: var(--muted); padding: 30px; }
 
 .login-wrap { min-height: 100dvh; display: grid; place-items: center; padding: 16px; background: var(--night); }
-.login-card { width: min(380px, 100%); background: var(--card); border-radius: 26px; padding: 26px 22px; display: grid; gap: 12px; }
+.login-card { width: min(340px, calc(100% - 32px)); background: var(--card); border-radius: 26px; padding: 26px 22px; display: grid; gap: 12px; }
 .login-card .logo { color: var(--ink); text-align: center; font-size: 34px; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; } }
