@@ -249,13 +249,15 @@
   }
 
   $$('[data-product]').forEach(function (card) {
-    // 홈 상품 카드는 상세페이지 링크로 동작합니다. 상세페이지에서 ?p=로 돌아온 경우에만 시트를 엽니다.
-    if (card.tagName.toLowerCase() !== 'a') {
-      card.addEventListener('click', function () { openProduct(Number(card.getAttribute('data-product'))); });
-    }
+    // 상품은 항상 독립 상세 페이지로 이동합니다. 상품 모달을 열지 않습니다.
+    var id = Number(card.getAttribute('data-product'));
+    if (!id) return;
+    card.addEventListener('click', function (e) {
+      if (card.tagName.toLowerCase() === 'a') return;
+      e.preventDefault();
+      location.href = '/p/' + id;
+    });
   });
-  var qp = new URLSearchParams(location.search).get('p');
-  if (qp && $('[data-grid]')) openProduct(Number(qp));
 
   // ===== 장바구니 시트 =====
   var cs = $('#cartSheet');
