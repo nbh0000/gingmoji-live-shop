@@ -286,7 +286,7 @@ function product_card(array $product, array $settings, bool $showPrice): string
 {
     $soldout = (int)$product['is_soldout'] || (int)$product['stock'] <= 0;
     $stockLabel = $soldout ? '품절' : (($settings['show_stock'] && (int)$product['stock'] <= 3) ? '남은 ' . (int)$product['stock'] . '개' : '');
-    return '<a class="card ' . ($soldout ? 'soldout' : '') . '" href="/p/' . (int)$product['id'] . '" data-product="' . (int)$product['id'] . '"><div class="thumb">' . (!empty($product['image_id']) ? '<img src="/img/' . (int)$product['image_id'] . '" alt="" loading="lazy">' : '<span class="ph">이미지</span>') . '</div><div class="name">' . e($product['name']) . '</div><div class="row"><div><div class="price ' . ($showPrice ? '' : 'hidden') . '" data-price-label>' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</div><div class="stock-tag" data-stock-label>' . e($stockLabel) . '</div></div><span class="add-dot">+</span></div></a>';
+    return '<a class="card ' . ($soldout ? 'soldout' : '') . '" href="/p/' . (int)$product['id'] . '" data-product="' . (int)$product['id'] . '"><div class="thumb">' . (!empty($product['image_id']) ? '<img src="/img/' . (int)$product['image_id'] . '" alt="" loading="lazy">' : '<span class="ph">이미지</span>') . '</div><div class="name">' . e($product['name']) . '</div><div class="row"><div><div class="price ' . ($showPrice ? '' : 'hidden') . '" data-price-label>' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</div><div class="stock-tag" data-stock-label>' . e($stockLabel) . '</div></div></div></a>';
 }
 
 function handle_image(int $id): never
