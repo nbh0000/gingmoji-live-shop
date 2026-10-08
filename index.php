@@ -35,7 +35,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php4' : '/static/css/shop.css?v=php7';
+    $css = $admin ? '/static/css/admin.css?v=php4' : '/static/css/shop.css?v=php8';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -72,7 +72,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     }
     echo $body;
     echo '<footer class="foot"><div class="wrap"><div class="brand">깅모지</div><nav class="foot-links"><a href="/page/terms">이용약관</a><a href="/page/privacy">개인정보처리방침</a><a href="/page/refund">교환·환불 정책</a></nav><div class="biz"><span>상호 ' . e($s['biz_name']) . '</span><span>대표자 ' . e($s['biz_owner']) . '</span><br><span>사업자등록번호 ' . e($s['biz_reg_no']) . '</span><br><span>주소 ' . e($s['biz_address']) . '</span><br><span>연락처 ' . e($s['biz_phone']) . '</span></div></div></footer>';
-    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php5"></script>' . $extra . '</body></html>';
+    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php6"></script>' . $extra . '</body></html>';
     exit;
 }
 
@@ -382,6 +382,20 @@ function handle_api(string $path): never
     json_out(['ok' => false, 'message' => 'API를 찾을 수 없습니다.'], 404);
 }
 
+function active_kept_orders(int $userId): array
+{
+    $stmt = db()->prepare("SELECT * FROM orders WHERE user_id=? AND status='kept' AND shipment_request_id IS NULL ORDER BY paid_at,id");
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll();
+}
+
+function active_kept_amount(int $userId): int
+{
+    $stmt = db()->prepare("SELECT COALESCE(SUM(items_amount),0) FROM orders WHERE user_id=? AND status='kept' AND shipment_request_id IS NULL");
+    $stmt->execute([$userId]);
+    return (int)$stmt->fetchColumn();
+}
+
 function cart_quote(array $input): array
 {
     $settings = setting_values();
@@ -416,9 +430,12 @@ function cart_quote(array $input): array
         $itemsAmount += $lineAmount;
         $lines[] = ['productId' => $id, 'name' => $product['name'], 'unitPrice' => $unitPrice, 'packageType' => $packageType, 'packageLabel' => $packageLabel, 'qty' => $qty, 'opened' => (int)($line['opened'] ?? 0), 'unopened' => (int)($line['unopened'] ?? 0), 'useOpenOption' => (bool)$product['use_open_option'], 'imageId' => $imageId, 'lineAmount' => $lineAmount, 'stock' => (int)$product['stock'], 'problem' => $problem];
     }
-    $delivery = ($input['deliveryType'] ?? 'direct') === 'keep' ? 'keep' : 'direct';
-    $shipping = $delivery === 'keep' ? 0 : ($itemsAmount >= (int)$settings['free_shipping_threshold'] ? 0 : (int)$settings['shipping_fee']);
     $user = current_user();
+    $delivery = ($input['deliveryType'] ?? 'direct') === 'keep' ? 'keep' : 'direct';
+    $includeKept = $delivery === 'direct' && !empty($input['includeKept']) && $user;
+    $keptAmount = $includeKept ? active_kept_amount((int)$user['id']) : 0;
+    $shippingBase = $itemsAmount + $keptAmount;
+    $shipping = $delivery === 'keep' ? 0 : ($shippingBase >= (int)$settings['free_shipping_threshold'] ? 0 : (int)$settings['shipping_fee']);
     $pointUse = 0;
     $maxPoints = 0;
     if ($user) {
@@ -428,7 +445,7 @@ function cart_quote(array $input): array
         $pointUse = $maxPoints;
     }
     $total = max(0, $itemsAmount + $shipping - $pointUse);
-    return ['ok' => true, 'live' => (bool)$settings['live_on'], 'lines' => $lines, 'hasProblem' => $hasProblem, 'summary' => ['itemsAmount' => $itemsAmount, 'shippingFee' => $shipping, 'deliveryType' => $delivery, 'pointUsed' => $pointUse, 'total' => $total, 'maxPoints' => $maxPoints, 'remainingForFree' => max(0, (int)$settings['free_shipping_threshold'] - $itemsAmount)]];
+    return ['ok' => true, 'live' => (bool)$settings['live_on'], 'lines' => $lines, 'hasProblem' => $hasProblem, 'summary' => ['itemsAmount' => $itemsAmount, 'keptAmount' => $keptAmount, 'includeKept' => (bool)$includeKept, 'shippingBase' => $shippingBase, 'shippingFee' => $shipping, 'deliveryType' => $delivery, 'pointUsed' => $pointUse, 'total' => $total, 'maxPoints' => $maxPoints, 'remainingForFree' => max(0, (int)$settings['free_shipping_threshold'] - $shippingBase)]];
 }
 
 function create_order(array $input): never
@@ -465,6 +482,8 @@ function create_order(array $input): never
         $pdo->beginTransaction();
         $orderNo = 'GM' . date('ymdHis') . random_int(10, 99);
         $delivery = $quote['summary']['deliveryType'];
+        $includeKept = (bool)$quote['summary']['includeKept'];
+        $keptAmount = (int)$quote['summary']['keptAmount'];
         $expires = date('Y-m-d H:i:s', time() + ((int)$settings['bank_auto_cancel_hours'] * 3600));
         $pointUsed = (int)$quote['summary']['pointUsed'];
         if ($pointUsed > 0) {
@@ -483,8 +502,8 @@ function create_order(array $input): never
             if (!$row || $row['is_soldout'] || (int)$row['stock'] < (int)$line['qty']) throw new RuntimeException('재고가 변경되어 주문을 다시 시도해 주세요.');
             $pdo->prepare('UPDATE products SET stock = stock - ? WHERE id = ?')->execute([$line['qty'], $line['productId']]);
         }
-        $stmt = $pdo->prepare('INSERT INTO orders (order_no,user_id,status,payment_method,delivery_type,items_amount,shipping_fee,point_used,total_amount,recipient_name,recipient_phone,zipcode,address1,address2,memo,depositor_name,cash_receipt_type,cash_receipt_value,cash_receipt_status,youtube_nickname,reserve_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-        $stmt->execute([$orderNo, $user['id'], 'pending', 'bank', $delivery, $quote['summary']['itemsAmount'], $quote['summary']['shippingFee'], $pointUsed, $quote['summary']['total'], $name, $phone, (string)($recipient['zipcode'] ?? ''), $address1, trim((string)($recipient['address2'] ?? '')), trim((string)($recipient['memo'] ?? '')), trim((string)($input['depositorName'] ?? '')), $receiptType, $receiptValue, $receiptType === 'none' ? 'none' : 'requested', $user['youtube_nickname'] ?? '', $expires]);
+        $stmt = $pdo->prepare('INSERT INTO orders (order_no,user_id,status,payment_method,delivery_type,keep_merge_requested,keep_merge_amount,items_amount,shipping_fee,point_used,total_amount,recipient_name,recipient_phone,zipcode,address1,address2,memo,depositor_name,cash_receipt_type,cash_receipt_value,cash_receipt_status,youtube_nickname,reserve_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $stmt->execute([$orderNo, $user['id'], 'pending', 'bank', $delivery, $includeKept ? 1 : 0, $keptAmount, $quote['summary']['itemsAmount'], $quote['summary']['shippingFee'], $pointUsed, $quote['summary']['total'], $name, $phone, (string)($recipient['zipcode'] ?? ''), $address1, trim((string)($recipient['address2'] ?? '')), trim((string)($recipient['memo'] ?? '')), trim((string)($input['depositorName'] ?? '')), $receiptType, $receiptValue, $receiptType === 'none' ? 'none' : 'requested', $user['youtube_nickname'] ?? '', $expires]);
         $orderId = (int)$pdo->lastInsertId();
         $itemStmt = $pdo->prepare('INSERT INTO order_items (order_id,product_id,product_name,package_type,unit_price,qty,qty_opened,qty_unopened,line_amount) VALUES (?,?,?,?,?,?,?,?,?)');
         foreach ($quote['lines'] as $line) {
@@ -550,9 +569,10 @@ function render_checkout(): never
     $user = require_user();
     $settings = setting_values();
     $pointGuide = e((string)$settings['point_guide_text']);
-    $body = '<main class="wrap page"><div class="page-title"><h1>주문서</h1></div><div class="panel"><div data-co-lines></div><div class="summary"><div class="sum-row"><span>상품금액</span><span data-sum-items>-</span></div><div class="sum-row"><span>배송비</span><span data-sum-ship>-</span></div><div class="sum-row" data-sum-point-row hidden><span>포인트</span><span data-sum-point>-</span></div><div class="sum-row total"><span>결제금액</span><span data-sum-total>-</span></div></div><p class="hint" data-free-hint></p><form data-addr-form><h2>배송 정보</h2><label class="field"><span>받는 분</span><input name="name" value="' . e($user['name']) . '"></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '"></label><label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label><label class="field"><span>배송 메모</span><input name="memo"></label><label><input type="checkbox" name="saveAddress" checked> 다음에도 이 주소 사용</label><button type="button" class="btn sm" data-edit-addr hidden>주소 수정</button><h2>배송 방법</h2><label><input type="radio" name="delivery" value="direct" checked> 바로배송</label><label><input type="radio" name="delivery" value="keep"> 킵 보관</label><h2>결제 수단</h2><label><input type="radio" name="payment" value="bank" checked> 계좌이체</label><input name="depositorName" placeholder="입금자명"><div data-cash-receipt><h3>현금영수증</h3><label><input type="radio" name="cashReceiptType" value="none" checked> 신청 안 함</label><label><input type="radio" name="cashReceiptType" value="income"> 소득공제용</label><label><input type="radio" name="cashReceiptType" value="expense"> 지출증빙용</label><input name="cashReceiptValue" data-cash-receipt-value placeholder="휴대폰 번호 또는 사업자등록번호" hidden></div><h2>포인트</h2><p class="hint">' . $pointGuide . '</p><input data-point-input name="pointUse" inputmode="numeric" placeholder="사용할 포인트"><button type="button" class="btn sm" data-point-max>최대 사용</button><p class="hint" data-point-hint></p><button type="button" class="btn big block pink" data-place-order>주문하기</button></form></div></main><script>window.GM.freeShip=' . (int)$settings['free_shipping_threshold'] . ';window.GM.shipFee=' . (int)$settings['shipping_fee'] . ';</script>';
-    $body = preg_replace('/<input data-point-input[^>]*><button type="button" class="btn sm" data-point-max>.*?<\/button>/', '<p class="hint">보유 포인트가 10,000P 이상이면 결제 시 10,000P 단위로 자동 사용됩니다.</p>', $body);
-    page('주문서', $body, false, ['/static/js/checkout.js?v=php3']);
+    $keptAmount = active_kept_amount((int)$user['id']);
+    $keepMerge = $keptAmount > 0 ? '<div class="keep-merge" data-keep-merge hidden><label class="check"><input type="checkbox" name="includeKept" data-include-kept> 킵 보관 상품도 같이 배송받기 <span class="meta">(' . won($keptAmount) . ' 보관 중)</span></label><p class="hint">보관 중인 상품금액과 이번 주문을 합산해 8만 원 이상이면 배송비가 무료예요.</p></div>' : '';
+    $body = '<main class="wrap page"><div class="page-title"><h1>주문서</h1></div><div class="panel"><div data-co-lines></div><div class="summary"><div class="sum-row"><span>상품금액</span><span data-sum-items>-</span></div><div class="sum-row"><span>배송비</span><span data-sum-ship>-</span></div><div class="sum-row" data-sum-point-row hidden><span>포인트</span><span data-sum-point>-</span></div><div class="sum-row total"><span>결제금액</span><span data-sum-total>-</span></div></div><p class="hint" data-free-hint></p><form data-addr-form><h2>배송 정보</h2><label class="field"><span>받는 분</span><input name="name" value="' . e($user['name']) . '"></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '"></label><label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label><label class="field"><span>배송 메모</span><input name="memo"></label><label class="check"><input type="checkbox" name="saveAddress" checked> 다음에도 이 주소 사용</label><button type="button" class="btn sm" data-edit-addr hidden>주소 수정</button><h2>배송 방법</h2><div class="choices delivery-choices"><label class="choice"><input type="radio" name="delivery" value="direct" checked><span class="tile"><span class="t">바로배송</span><span class="d">8만 원 이상 무료 · 미만 4,000원</span></span></label><label class="choice"><input type="radio" name="delivery" value="keep"><span class="tile"><span class="t">킵(보관)</span><span class="d">배송비 없이 보관 · 나중에 함께 배송</span></span></label></div>' . $keepMerge . '<h2>결제 수단</h2><label class="check"><input type="radio" name="payment" value="bank" checked> 계좌이체</label><input name="depositorName" placeholder="입금자명"><div data-cash-receipt><h3>현금영수증</h3><label class="check"><input type="radio" name="cashReceiptType" value="none" checked> 신청 안 함</label><label class="check"><input type="radio" name="cashReceiptType" value="income"> 소득공제용</label><label class="check"><input type="radio" name="cashReceiptType" value="expense"> 지출증빙용</label><input name="cashReceiptValue" data-cash-receipt-value placeholder="휴대폰 번호 또는 사업자등록번호" hidden></div><h2>포인트</h2><p class="hint">' . $pointGuide . '</p><p class="hint">보유 포인트가 10,000P 이상이면 결제 시 10,000P 단위로 자동 사용됩니다.</p><p class="hint" data-point-hint></p><button type="button" class="btn big block pink" data-place-order>주문하기</button></form></div></main><script>window.GM.freeShip=' . (int)$settings['free_shipping_threshold'] . ';window.GM.shipFee=' . (int)$settings['shipping_fee'] . ';window.GM.keptAmount=' . $keptAmount . ';</script>';
+    page('주문서', $body, false, ['/static/js/checkout.js?v=php4']);
 }
 
 function render_order(string $orderNo): never
@@ -573,7 +593,9 @@ function render_order(string $orderNo): never
     }
     $settings = setting_values();
     $receipt = $order['cash_receipt_type'] === 'none' ? '신청 안 함' : ($order['cash_receipt_type'] === 'income' ? '소득공제용' : '지출증빙용');
-    $body = '<main class="wrap page"><div class="panel"><h1>주문 완료</h1><p>주문번호 <strong>' . e($order['order_no']) . '</strong></p><p>상태: ' . e(order_status_label($order)) . '</p><ul class="order-items">' . $rows . '</ul><div class="sum-row total"><span>결제금액</span><span>' . won($order['total_amount']) . '</span></div><div class="notice">입금 계좌: ' . e($settings['bank_name']) . ' ' . e($settings['bank_account']) . ' (' . e($settings['bank_holder']) . ')<br>입금자명: ' . e($order['depositor_name']) . '<br>현금영수증: ' . e($receipt) . '</div><a class="btn block" href="/my/orders">주문 내역 보기</a></div></main>';
+    $deliveryLabel = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
+    $mergeNotice = !empty($order['keep_merge_requested']) ? '<br>킵 보관 상품 ' . won($order['keep_merge_amount']) . ' 같이 배송' : '';
+    $body = '<main class="wrap page"><div class="panel"><h1>주문 완료</h1><p>주문번호 <strong>' . e($order['order_no']) . '</strong></p><p>상태: ' . e(order_status_label($order)) . '<br>배송 방식: ' . e($deliveryLabel) . $mergeNotice . '</p><ul class="order-items">' . $rows . '</ul><div class="sum-row total"><span>결제금액</span><span>' . won($order['total_amount']) . '</span></div><div class="notice">입금 계좌: ' . e($settings['bank_name']) . ' ' . e($settings['bank_account']) . ' (' . e($settings['bank_holder']) . ')<br>입금자명: ' . e($order['depositor_name']) . '<br>현금영수증: ' . e($receipt) . '</div><a class="btn block" href="/my/orders">주문 내역 보기</a></div></main>';
     page('주문 완료', $body);
 }
 
@@ -587,11 +609,46 @@ function render_my(string $path): never
         foreach ($stmt as $entry) $rows .= '<tr><td>' . e(dt($entry['created_at'])) . '</td><td>' . e($entry['memo']) . '</td><td>' . num($entry['amount']) . 'P</td><td>' . num($entry['balance_after']) . 'P</td></tr>';
         page('포인트', '<main class="wrap page"><div class="panel"><h1>포인트 ' . num($user['point_balance']) . 'P</h1><p class="hint">' . e(setting_values()['point_guide_text']) . '</p><table><tbody>' . $rows . '</tbody></table></div></main>');
     }
-    $stmt = db()->prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 100');
-    $stmt->execute([$user['id']]);
-    $rows = '';
-    foreach ($stmt as $order) $rows .= '<tr><td><a href="/orders/' . e($order['order_no']) . '">' . e($order['order_no']) . '</a></td><td>' . e(dt($order['created_at'])) . '</td><td>' . e(order_status_label($order)) . '</td><td>' . won($order['total_amount']) . '</td></tr>';
-    page('마이페이지', '<main class="wrap page"><div class="panel"><h1>' . e($user['name'] ?: $user['login_id']) . '님</h1><p><a class="btn sm" href="/my/points">포인트 보기</a> <a class="btn sm" href="/logout">로그아웃</a></p><table><tbody>' . $rows . '</tbody></table></div></main>');
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_value('action') === 'profile') {
+        $name = trim((string)post_value('name'));
+        $phone = trim((string)post_value('phone'));
+        $youtube = trim((string)post_value('youtube_nickname'));
+        $zipcode = trim((string)post_value('zipcode'));
+        $address1 = trim((string)post_value('address1'));
+        $address2 = trim((string)post_value('address2'));
+        if ($name === '' || $phone === '' || $youtube === '') {
+            flash('error', '성함, 휴대폰, 유튜브 닉네임을 입력해 주세요.');
+        } else {
+            db()->prepare('UPDATE users SET name=?,phone=?,youtube_nickname=?,zipcode=?,address1=?,address2=?,profile_completed=1 WHERE id=?')->execute([$name, $phone, $youtube, $zipcode, $address1, $address2, $user['id']]);
+            flash('ok', '회원 정보가 수정되었습니다.');
+            redirect_to('/my');
+        }
+        $user = array_merge($user, ['name' => $name, 'phone' => $phone, 'youtube_nickname' => $youtube, 'zipcode' => $zipcode, 'address1' => $address1, 'address2' => $address2]);
+    }
+
+    $settings = setting_values();
+    $keptStmt = db()->prepare("SELECT * FROM orders WHERE user_id=? AND status='kept' AND shipment_request_id IS NULL ORDER BY paid_at,id");
+    $keptStmt->execute([$user['id']]);
+    $keptRows = '';
+    $keptAmount = 0;
+    foreach ($keptStmt as $order) {
+        $keptAmount += (int)$order['items_amount'];
+        $keptRows .= '<a class="item my-order-item" href="/orders/' . e($order['order_no']) . '"><div class="top-row"><strong>킵 보관 · ' . e($order['order_no']) . '</strong><span class="meta">' . e(dt($order['paid_at'] ?: $order['created_at'])) . '</span></div><div class="my-order-row"><span>' . e(order_status_label($order)) . '</span><b>' . won($order['items_amount']) . '</b></div></a>';
+    }
+
+    $orderStmt = db()->prepare('SELECT * FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 30');
+    $orderStmt->execute([$user['id']]);
+    $orderRows = '';
+    foreach ($orderStmt as $order) {
+        $deliveryLabel = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
+        $orderRows .= '<a class="item my-order-item" href="/orders/' . e($order['order_no']) . '"><div class="top-row"><strong>' . e($order['order_no']) . '</strong><span class="meta">' . e(dt($order['created_at'])) . '</span></div><div class="my-order-row"><span>' . e($deliveryLabel . ' · ' . order_status_label($order)) . '</span><b>' . won($order['total_amount']) . '</b></div></a>';
+    }
+
+    $profile = '<form method="post" class="profile-form"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="profile"><div class="profile-grid"><label class="field"><span>아이디</span><input value="' . e($user['login_id']) . '" readonly></label><label class="field"><span>성함</span><input name="name" value="' . e($user['name']) . '" required></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '" required></label><label class="field"><span>유튜브 닉네임</span><input name="youtube_nickname" value="' . e($user['youtube_nickname']) . '" required></label></div><label class="field"><span>주소</span><div class="field-row address-search-row"><input class="grow" name="zipcode" data-signup-zipcode value="' . e($user['zipcode']) . '" placeholder="우편번호" readonly><button type="button" class="btn small ghost" data-address-search>주소 검색</button></div><input name="address1" data-signup-address value="' . e($user['address1']) . '" placeholder="주소 검색으로 입력" readonly><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소" autocomplete="street-address"></label><button class="btn big block pink">회원 정보 저장</button></form>';
+    $keepSummary = $keptRows ? '<p class="hint">현재 <strong>' . won($keptAmount) . '</strong> 보관 중이에요. 상품을 더 담은 뒤 주문서에서 <strong>킵 상품 같이 배송받기</strong>를 선택할 수 있어요.</p>' : '<p class="my-empty">현재 보관 중인 킵 상품이 없어요.</p>';
+    $body = '<main class="wrap page"><div class="page-title"><h1>마이페이지</h1></div><section class="panel profile-panel"><div class="my-heading"><div><h2>' . e($user['name'] ?: $user['login_id']) . '님</h2><p class="hint">가입 정보를 확인하고 수정할 수 있어요.</p></div><div class="my-heading-actions"><a class="btn sm soft" href="/my/points">포인트 ' . num($user['point_balance']) . 'P</a><a class="btn sm" href="/logout">로그아웃</a></div></div>' . $profile . '</section><section class="panel my-section"><div class="section-head"><h2>킵 보관함</h2><a class="btn sm ghost" href="/">상품 더 담기</a></div>' . $keepSummary . '<div class="list">' . ($keptRows ?: '') . '</div></section><section class="panel my-section"><h2>최근 주문</h2><div class="list">' . ($orderRows ?: '<p class="my-empty">아직 주문 내역이 없어요.</p>') . '</div></section></main>';
+    page('마이페이지', shop_body($body, true), false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1']);
 }
 
 function render_policy(string $slug): never
@@ -853,7 +910,12 @@ function admin_order(int $id): never
     $items->execute([$id]);
     $list = '';
         foreach ($items as $item) $list .= '<li>' . e($item['product_name']) . ($item['package_type'] === 'full' ? ' · 풀박' : ($item['package_type'] === 'loose' ? ' · 낱박' : '')) . ' × ' . (int)$item['qty'] . ' · ' . won($item['line_amount']) . '</li>';
-    $html = '<div class="page-head"><h1>주문 ' . e($order['order_no']) . '</h1></div><div class="card"><p>회원: ' . e($order['login_id']) . '</p><p>상태: ' . e(order_status_label($order)) . '</p><p>받는 분: ' . e($order['recipient_name']) . ' / ' . e($order['recipient_phone']) . '</p><p>주소: ' . e($order['address1']) . ' ' . e($order['address2']) . '</p><p>현금영수증: ' . e((string)$order['cash_receipt_type']) . ' / ' . e((string)$order['cash_receipt_value']) . '</p><ul>' . $list . '</ul><div class="sum-row total">' . won($order['total_amount']) . '</div><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><button class="btn pink" name="action" value="confirm">입금 확인·포인트 적립</button> <button class="btn danger" name="action" value="cancel">주문 취소</button></form></div>';
+    $deliveryInfo = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
+    if (!empty($order['keep_merge_requested'])) $deliveryInfo .= ' · 기존 킵 ' . won($order['keep_merge_amount']) . ' 같이 배송';
+    $actionButtons = $order['status'] === 'pending' ? '<button class="btn pink" name="action" value="confirm">입금 확인·포인트 적립</button> <button class="btn danger" name="action" value="cancel">주문 취소</button>' : '';
+    if (in_array($order['status'], ['paid', 'preparing'], true)) $actionButtons .= ' <button class="btn pink" name="action" value="ship">발송 완료 처리</button>';
+    if ($actionButtons === '') $actionButtons = '<span class="hint">추가로 처리할 작업이 없습니다.</span>';
+    $html = '<div class="page-head"><h1>주문 ' . e($order['order_no']) . '</h1></div><div class="card"><p>회원: ' . e($order['login_id']) . '</p><p>상태: ' . e(order_status_label($order)) . '</p><p>배송 방식: ' . e($deliveryInfo) . '</p><p>받는 분: ' . e($order['recipient_name']) . ' / ' . e($order['recipient_phone']) . '</p><p>주소: ' . e($order['address1']) . ' ' . e($order['address2']) . '</p><p>현금영수증: ' . e((string)$order['cash_receipt_type']) . ' / ' . e((string)$order['cash_receipt_value']) . '</p><ul>' . $list . '</ul><div class="sum-row total">' . won($order['total_amount']) . '</div><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '">' . $actionButtons . '</form></div>';
     admin_shell('주문 상세', $html);
 }
 
@@ -878,7 +940,25 @@ function admin_order_action(int $id, string $action): never
                 $rate = $dayTotal >= (float)$policy['threshold'] ? (float)$policy['over'] : (float)$policy['under'];
                 $earned = points_for((float)$order['items_amount'], (float)$order['point_used'], $rate);
             }
-            $pdo->prepare("UPDATE orders SET status='paid',paid_at=NOW(),reserve_expires_at=NULL,point_earned=? WHERE id=?")->execute([$earned,$id]);
+            $nextStatus = $order['delivery_type'] === 'keep' ? 'kept' : 'paid';
+            $shipmentRequestId = null;
+            if ($nextStatus === 'paid' && !empty($order['keep_merge_requested'])) {
+                $keepStmt = $pdo->prepare("SELECT id,items_amount FROM orders WHERE user_id=? AND status='kept' AND shipment_request_id IS NULL ORDER BY paid_at,id FOR UPDATE");
+                $keepStmt->execute([$order['user_id']]);
+                $keptOrders = $keepStmt->fetchAll();
+                if ($keptOrders) {
+                    $keepIds = array_map(static fn(array $kept): int => (int)$kept['id'], $keptOrders);
+                    $keptTotal = array_sum(array_map(static fn(array $kept): int => (int)$kept['items_amount'], $keptOrders));
+                    $requestNo = 'KS' . date('ymdHis') . random_int(10, 99);
+                    $shipStmt = $pdo->prepare('INSERT INTO shipment_requests (request_no,user_id,status,kept_amount,shipping_fee,payment_method,depositor_name,recipient_name,recipient_phone,zipcode,address1,address2,memo,paid_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())');
+                    $shipStmt->execute([$requestNo, $order['user_id'], 'preparing', $keptTotal, $order['shipping_fee'], 'bank', $order['depositor_name'], $order['recipient_name'], $order['recipient_phone'], $order['zipcode'], $order['address1'], $order['address2'], $order['memo']]);
+                    $shipmentRequestId = (int)$pdo->lastInsertId();
+                    $marks = implode(',', array_fill(0, count($keepIds), '?'));
+                    $pdo->prepare("UPDATE orders SET shipment_request_id=?,status='preparing' WHERE id IN ($marks)")->execute(array_merge([$shipmentRequestId], $keepIds));
+                    $nextStatus = 'preparing';
+                }
+            }
+            $pdo->prepare('UPDATE orders SET status=?,paid_at=NOW(),reserve_expires_at=NULL,point_earned=?,shipment_request_id=? WHERE id=?')->execute([$nextStatus,$earned,$shipmentRequestId,$id]);
             if ($earned > 0) {
                 $balance = $pdo->prepare('SELECT point_balance FROM users WHERE id=?');
                 $balance->execute([$order['user_id']]);
@@ -887,6 +967,12 @@ function admin_order_action(int $id, string $action): never
                 $pdo->prepare('INSERT INTO point_ledger (user_id,type,amount,balance_after,order_id,memo) VALUES (?,?,?,?,?,?)')->execute([$order['user_id'],'earn',$earned,$after,$id,'주문 적립']);
             }
             $pdo->prepare('UPDATE payments SET status="paid",paid_at=NOW() WHERE target_type="order" AND target_id=?')->execute([$id]);
+        } elseif ($action === 'ship' && in_array($order['status'], ['paid', 'preparing'], true)) {
+            $pdo->prepare("UPDATE orders SET status='shipped',shipped_at=NOW() WHERE id=?")->execute([$id]);
+            if (!empty($order['shipment_request_id'])) {
+                $pdo->prepare("UPDATE orders SET status='shipped',shipped_at=NOW() WHERE shipment_request_id=?")->execute([$order['shipment_request_id']]);
+                $pdo->prepare("UPDATE shipment_requests SET status='shipped',shipped_at=NOW() WHERE id=?")->execute([$order['shipment_request_id']]);
+            }
         } elseif ($action === 'cancel' && $order['status'] !== 'cancelled') {
             $items = $pdo->prepare('SELECT product_id,qty FROM order_items WHERE order_id=?');
             $items->execute([$id]);

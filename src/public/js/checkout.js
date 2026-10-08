@@ -9,6 +9,7 @@
 
   function delivery() { return ($('input[name="delivery"]:checked') || {}).value || 'direct'; }
   function payment() { return ($('input[name="payment"]:checked') || {}).value || ''; }
+  function includeKept() { var el = $('[name="includeKept"]'); return !!(el && el.checked && delivery() === 'direct'); }
   function pointUse() { var el = $('[data-point-input]'); return el ? parseInt(el.value.replace(/[^0-9]/g, ''), 10) || 0 : 0; }
   function cashReceipt() {
     var type = ($('input[name="cashReceiptType"]:checked') || {}).value || 'none';
@@ -45,23 +46,34 @@
   function renderSummary(q) {
     var sm = q && q.summary;
     $('[data-sum-items]').textContent = sm ? S.won(sm.itemsAmount) : '-';
-    $('[data-sum-ship]').textContent = sm ? (sm.deliveryType === 'keep' ? '킵 (출고 시 결정)' : (sm.shippingFee ? S.won(sm.shippingFee) : '무료')) : '-';
+    $('[data-sum-ship]').textContent = sm ? (sm.deliveryType === 'keep' ? '킵 (지금 무료)' : (sm.shippingFee ? S.won(sm.shippingFee) : '무료')) : '-';
     var pr = $('[data-sum-point-row]');
     if (pr) { pr.hidden = !(sm && sm.pointUsed); $('[data-sum-point]').textContent = sm ? '-' + sm.pointUsed.toLocaleString('ko-KR') + 'P' : ''; }
     $('[data-sum-total]').textContent = sm ? S.won(sm.total) : '-';
     var hint = $('[data-free-hint]');
     if (sm && sm.deliveryType === 'direct' && sm.remainingForFree > 0) {
       hint.hidden = false;
-      hint.innerHTML = '<b style="color:var(--pink-dd)">' + S.won(sm.remainingForFree) + '</b> 더 담으면 무료배송이에요';
+      hint.innerHTML = (sm.includeKept && sm.keptAmount ? '킵 ' + S.won(sm.keptAmount) + '을 합산해도 ' : '') + '<b style="color:var(--pink-dd)">' + S.won(sm.remainingForFree) + '</b> 더 담으면 무료배송이에요';
     } else if (sm && sm.deliveryType === 'keep') {
       hint.hidden = false;
-      hint.textContent = '킵 상품은 보관함에 모였다가, 출고 요청할 때 누적 금액이 ' + S.won(GM.freeShip) + ' 이상이면 무료로 보내드려요';
+      hint.textContent = '킵 상품은 배송비 없이 보관되며, 다음 주문에서 같이 배송받을 수 있어요.';
     } else hint.hidden = true;
     var ph = $('[data-point-hint]');
     if (ph && q) ph.textContent = sm && sm.maxPoints ? '이번 주문에서 최대 ' + sm.maxPoints.toLocaleString('ko-KR') + 'P 사용할 수 있어요' : '사용 조건을 충족하지 않아요';
     var pi = $('[data-point-input]');
     if (pi && sm && pointUse() > sm.pointUsed) pi.value = sm.pointUsed || '';
     syncButton();
+  }
+
+  function syncKeepMerge() {
+    var box = $('[data-keep-merge]');
+    if (!box) return;
+    var enabled = delivery() === 'direct';
+    box.hidden = !enabled;
+    if (!enabled) {
+      var input = $('[name="includeKept"]', box);
+      if (input) input.checked = false;
+    }
   }
 
   function syncButton() {
@@ -79,12 +91,14 @@
   function refresh() {
     var cart = S.load();
     if (!cart.length) { quote = { lines: [] }; renderLines(quote); renderSummary(null); return; }
-    S.api('POST', '/api/cart/quote', { lines: S.toLines(cart), deliveryType: delivery(), pointUse: pointUse() })
+    S.api('POST', '/api/cart/quote', { lines: S.toLines(cart), deliveryType: delivery(), includeKept: includeKept(), pointUse: pointUse() })
       .then(function (q) { quote = q; GM.live = q.live; renderLines(q); renderSummary(q); })
       .catch(function (e) { S.toast(e.message, 'error'); });
   }
 
-  $$('input[name="delivery"]').forEach(function (r) { r.addEventListener('change', refresh); });
+  $$('input[name="delivery"]').forEach(function (r) { r.addEventListener('change', function () { syncKeepMerge(); refresh(); }); });
+  var keptToggle = $('[name="includeKept"]');
+  if (keptToggle) keptToggle.addEventListener('change', refresh);
   $$('input[name="payment"]').forEach(function (r) {
     r.addEventListener('change', function () {
       var dep = $('[data-depositor]');
@@ -124,6 +138,7 @@
     var body = {
       lines: S.toLines(),
       deliveryType: delivery(),
+      includeKept: includeKept(),
       paymentMethod: payment(),
       pointUse: pointUse(),
       depositorName: val('depositorName'),
@@ -143,5 +158,6 @@
     });
   });
 
+  syncKeepMerge();
   refresh();
 })();
