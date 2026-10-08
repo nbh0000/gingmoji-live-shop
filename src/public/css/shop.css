@@ -314,7 +314,7 @@ body.has-cartbar main.wrap { max-width: 820px; }
 .detail-qty input { width: 58px; height: 36px; border: 0; border-inline: 1px solid var(--line); text-align: center; font: inherit; }
 .detail-total { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
 .detail-total strong { color: var(--ink); font-family: var(--f-display); font-size: 25px; font-weight: 400; letter-spacing: 0; }
-.detail-actions { display: grid; grid-template-columns: 48px 1fr; gap: 8px; margin-top: 16px; }
+.detail-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 16px; }
 .detail-actions .btn { border-radius: 4px; }
 .detail-wish { border: 1px solid var(--line); background: #fff; border-radius: 4px; color: var(--pink-dd); font-size: 24px; cursor: pointer; }
 .detail-tabs { display: flex; justify-content: center; gap: 0; border-bottom: 1px solid var(--line); margin-top: 90px; }
