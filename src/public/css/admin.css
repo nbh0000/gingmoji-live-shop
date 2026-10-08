@@ -55,7 +55,8 @@ button, a { touch-action: manipulation; }
 .nav a .cnt { background: var(--pink); color: var(--night); border-radius: 99px; padding: 1px 8px; font-size: 12px; font-weight: 800; }
 .side-foot { margin-top: auto; display: grid; gap: 8px; font-size: 12.5px; color: #a7989a; padding: 0 8px; }
 .side-foot a { color: #d7cacc; }
-.main { padding: 22px 26px 60px; min-width: 0; }
+.main { padding: 32px 42px 72px 36px; min-width: 0; }
+.main > :not(.admin-modal) { width: 100%; max-width: 1440px; }
 
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }
@@ -66,7 +67,7 @@ button, a { touch-action: manipulation; }
   .nav::-webkit-scrollbar { display: none; }
   .nav a { white-space: nowrap; padding: 8px 12px; }
   .side-foot { display: none; }
-  .main { padding: 16px 14px 60px; }
+  .main { padding: 18px 14px 60px; }
 }
 
 /* 헤더 */
