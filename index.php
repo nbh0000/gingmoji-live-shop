@@ -72,7 +72,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     }
     echo $body;
     echo '<footer class="foot"><div class="wrap"><div class="brand">깅모지</div><nav class="foot-links"><a href="/page/terms">이용약관</a><a href="/page/privacy">개인정보처리방침</a><a href="/page/refund">교환·환불 정책</a></nav><div class="biz"><span>상호 ' . e($s['biz_name']) . '</span><span>대표자 ' . e($s['biz_owner']) . '</span><br><span>사업자등록번호 ' . e($s['biz_reg_no']) . '</span><br><span>주소 ' . e($s['biz_address']) . '</span><br><span>연락처 ' . e($s['biz_phone']) . '</span></div></div></footer>';
-    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php4"></script>' . $extra . '</body></html>';
+    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php5"></script>' . $extra . '</body></html>';
     exit;
 }
 
@@ -126,18 +126,29 @@ function handle_shop(string $path): never
         if (!$gallery) {
             $gallery = '<div class="thumb"><span class="ph">이미지 없음</span></div>';
         }
+        $hasPackageOption = (bool)$product['use_package_option'];
+        $fullBoxPrice = (int)$product['full_box_price'] > 0 ? (int)$product['full_box_price'] : (int)$product['price'];
+        $loosePrice = (int)$product['loose_price'] > 0 ? (int)$product['loose_price'] : (int)$product['price'];
+        $packageHtml = '';
+        if ($hasPackageOption) {
+            $packageHtml = '<div class="detail-package-box"><div class="detail-option-label"><strong>상품 구성을 골라 주세요</strong><span>풀박 또는 낱박</span></div><div class="detail-package-options"><label class="detail-package-option"><input type="radio" name="detailPackage" value="full" checked><span><strong>풀박</strong><small>풀박스 구성 · 패키지에 모든 상품</small><b>' . won($fullBoxPrice) . '</b></span></label><label class="detail-package-option"><input type="radio" name="detailPackage" value="loose"><span><strong>낱박</strong><small>패키지 내 개별 상품</small><b>' . won($loosePrice) . '</b></span></label></div></div>';
+        }
         $detailImages = '';
         foreach ($product['images'] as $image) {
             $detailImages .= '<img class="detail-image" src="/img/' . (int)$image['id'] . '" alt="' . e($product['name']) . ' 상세 이미지" loading="lazy">';
         }
         $detailImages = $detailImages ? '<div class="detail-images" aria-label="상품 상세 이미지">' . $detailImages . '</div>' : '';
         $body = '<main class="detail-page"><div class="detail-breadcrumb"><a href="/">HOME</a><span>/</span><span>' . e($product['name']) . '</span></div><div class="detail-layout"><section class="detail-media"><div class="p-gallery detail-gallery">' . $gallery . '</div></section><section class="detail-info"><p class="detail-kicker">GINGMOJI COLLECTION</p><h1 class="p-name">' . e($product['name']) . '</h1><div class="' . ($showPrice ? 'p-price' : 'price hidden') . '">' . ($showPrice ? won($product['price']) : '가격은 방송 중 공개됩니다') . '</div><div class="p-meta">';
+        if ($hasPackageOption && $showPrice) {
+            $body = str_replace('<div class="p-price">' . won($product['price']) . '</div>', '<div class="p-price">구성별 가격</div>', $body);
+        }
         if ((int)$product['is_soldout'] || (int)$product['stock'] <= 0) {
             $body .= '<span class="chip gray">품절</span>';
         } elseif ($s['show_stock']) {
             $body .= '<span class="chip">재고 ' . (int)$product['stock'] . '개</span>';
         }
         $body .= '</div>';
+        $body .= $packageHtml;
         if ($product['description']) {
             $body .= '<div class="p-desc">' . nl2br(e($product['description'])) . '</div>';
         }
@@ -162,6 +173,9 @@ function handle_shop(string $path): never
   var price = __PRICE__;
   var max = __MAX__;
   var hasOption = __OPTION__;
+  var hasPackage = __PACKAGE__;
+  var packageType = hasPackage ? 'full' : 'standard';
+  var packagePrices = { full: __FULL_PRICE__, loose: __LOOSE_PRICE__, standard: price };
   var total = document.getElementById('detailTotal');
   var opened = 0;
   var unopened = 0;
@@ -181,7 +195,7 @@ function handle_shop(string $path): never
       document.getElementById('detailMinus').disabled = qty <= 1;
       document.getElementById('detailPlus').disabled = qty >= max;
     }
-    total.textContent = __SHOW_PRICE__ ? (price * count).toLocaleString('ko-KR') + '원' : '방송 중 공개';
+    total.textContent = __SHOW_PRICE__ ? ((packagePrices[packageType] || price) * count).toLocaleString('ko-KR') + '원' : '방송 중 공개';
     add.disabled = count < 1;
     add.textContent = count ? count + '개 담기' : '수량을 골라 주세요';
   }
@@ -189,6 +203,11 @@ function handle_shop(string $path): never
     if (kind === 'opened') opened = Math.max(0, Math.min(max - unopened, opened + delta));
     if (kind === 'unopened') unopened = Math.max(0, Math.min(max - opened, unopened + delta));
     sync();
+  }
+  if (hasPackage) {
+    document.querySelectorAll('input[name="detailPackage"]').forEach(function (radio) {
+      radio.addEventListener('change', function () { if (this.checked) { packageType = this.value; sync(); } });
+    });
   }
   if (hasOption) {
     document.getElementById('detailOpenedMinus').addEventListener('click', function () { change('opened', -1); });
@@ -205,11 +224,13 @@ function handle_shop(string $path): never
     if (!count) return;
     var cart = [];
     try { cart = JSON.parse(localStorage.getItem('gm_cart_v1')) || []; } catch (e) {}
-    var line = cart.find(function (item) { return Number(item.productId) === __ID__; });
+    var line = cart.find(function (item) { return Number(item.productId) === __ID__ && (item.packageType || 'standard') === packageType; });
     if (!line) {
-      line = { productId: __ID__, name: __NAME__, price: price, imageId: __IMAGE__, option: hasOption, opened: 0, unopened: 0, qty: 0 };
+      line = { productId: __ID__, name: __NAME__, price: packagePrices[packageType] || price, packageType: packageType, imageId: __IMAGE__, option: hasOption, opened: 0, unopened: 0, qty: 0 };
       cart.push(line);
     }
+    line.price = packagePrices[packageType] || price;
+    line.packageType = packageType;
     if (hasOption) {
       line.opened = (line.opened || 0) + opened;
       line.unopened = (line.unopened || 0) + unopened;
@@ -223,7 +244,7 @@ function handle_shop(string $path): never
 })();
 </script>
 HTML;
-        $detailScript = str_replace(['__PRICE__', '__MAX__', '__OPTION__', '__SHOW_PRICE__', '__ID__', '__NAME__', '__IMAGE__'], [(string)$detailPrice, (string)$detailMax, $detailHasOption, $showPrice ? 'true' : 'false', (string)$detailId, $detailName, (string)$detailImage], $detailScript);
+        $detailScript = str_replace(['__PRICE__', '__MAX__', '__OPTION__', '__PACKAGE__', '__FULL_PRICE__', '__LOOSE_PRICE__', '__SHOW_PRICE__', '__ID__', '__NAME__', '__IMAGE__'], [(string)$detailPrice, (string)$detailMax, $detailHasOption, $hasPackageOption ? 'true' : 'false', (string)$fullBoxPrice, (string)$loosePrice, $showPrice ? 'true' : 'false', (string)$detailId, $detailName, (string)$detailImage], $detailScript);
         $body .= $detailScript;
         page($product['name'], $body);
     }
@@ -294,7 +315,7 @@ function handle_api(string $path): never
         if (!$product || !(int)$product['is_visible']) {
             json_out(['ok' => false, 'message' => '상품을 찾을 수 없습니다.'], 404);
         }
-        json_out(['ok' => true, 'live' => (bool)$s['live_on'], 'product' => ['id' => (int)$product['id'], 'name' => $product['name'], 'description' => $product['description'] ?? '', 'price' => ($s['live_on'] || $s['always_show_price']) ? (int)$product['price'] : null, 'stock' => (int)$product['stock'], 'showStock' => (bool)$s['show_stock'], 'soldout' => (bool)$product['is_soldout'] || (int)$product['stock'] <= 0, 'useOpenOption' => (bool)$product['use_open_option'], 'images' => array_map(static fn(array $image): int => (int)$image['id'], $product['images'])]]);
+        json_out(['ok' => true, 'live' => (bool)$s['live_on'], 'product' => ['id' => (int)$product['id'], 'name' => $product['name'], 'description' => $product['description'] ?? '', 'price' => ($s['live_on'] || $s['always_show_price']) ? (int)$product['price'] : null, 'stock' => (int)$product['stock'], 'showStock' => (bool)$s['show_stock'], 'soldout' => (bool)$product['is_soldout'] || (int)$product['stock'] <= 0, 'usePackageOption' => (bool)$product['use_package_option'], 'fullBoxPrice' => (int)$product['full_box_price'], 'loosePrice' => (int)$product['loose_price'], 'useOpenOption' => (bool)$product['use_open_option'], 'images' => array_map(static fn(array $image): int => (int)$image['id'], $product['images'])]]);
     }
 
     if ($path === '/api/cart/quote' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -321,6 +342,12 @@ function cart_quote(array $input): array
         $id = (int)($line['productId'] ?? 0);
         if (!isset($byId[$id])) continue;
         $product = $byId[$id];
+        $packageType = in_array((string)($line['packageType'] ?? 'standard'), ['full', 'loose'], true) ? (string)$line['packageType'] : 'standard';
+        if (!(int)$product['use_package_option']) $packageType = 'standard';
+        $unitPrice = (int)$product['price'];
+        if ($packageType === 'full' && (int)$product['full_box_price'] > 0) $unitPrice = (int)$product['full_box_price'];
+        if ($packageType === 'loose' && (int)$product['loose_price'] > 0) $unitPrice = (int)$product['loose_price'];
+        $packageLabel = ['full' => '풀박', 'loose' => '낱박', 'standard' => ''][ $packageType ];
         $qty = (int)($product['use_open_option'] ? ($line['opened'] ?? 0) + ($line['unopened'] ?? 0) : ($line['qty'] ?? 0));
         if ($qty < 1) continue;
         $problem = '';
@@ -330,22 +357,20 @@ function cart_quote(array $input): array
         if ($problem) $hasProblem = true;
         $image = one_product((int)$product['id']);
         $imageId = $image && $image['images'] ? (int)$image['images'][0]['id'] : null;
-        $lineAmount = (int)$product['price'] * $qty;
+        $lineAmount = $unitPrice * $qty;
         $itemsAmount += $lineAmount;
-        $lines[] = ['productId' => $id, 'name' => $product['name'], 'unitPrice' => (int)$product['price'], 'qty' => $qty, 'opened' => (int)($line['opened'] ?? 0), 'unopened' => (int)($line['unopened'] ?? 0), 'useOpenOption' => (bool)$product['use_open_option'], 'imageId' => $imageId, 'lineAmount' => $lineAmount, 'stock' => (int)$product['stock'], 'problem' => $problem];
+        $lines[] = ['productId' => $id, 'name' => $product['name'], 'unitPrice' => $unitPrice, 'packageType' => $packageType, 'packageLabel' => $packageLabel, 'qty' => $qty, 'opened' => (int)($line['opened'] ?? 0), 'unopened' => (int)($line['unopened'] ?? 0), 'useOpenOption' => (bool)$product['use_open_option'], 'imageId' => $imageId, 'lineAmount' => $lineAmount, 'stock' => (int)$product['stock'], 'problem' => $problem];
     }
     $delivery = ($input['deliveryType'] ?? 'direct') === 'keep' ? 'keep' : 'direct';
     $shipping = $delivery === 'keep' ? 0 : ($itemsAmount >= (int)$settings['free_shipping_threshold'] ? 0 : (int)$settings['shipping_fee']);
     $user = current_user();
-    $pointUse = max(0, (int)($input['pointUse'] ?? 0));
+    $pointUse = 0;
     $maxPoints = 0;
-    if ($user && $settings['point_use_enabled']) {
+    if ($user) {
+        $pointUnit = 10000;
         $maxPoints = min((int)$user['point_balance'], max(0, $itemsAmount + $shipping));
-        $maxPoints = (int)(floor($maxPoints / max(1, (int)$settings['point_use_unit'])) * (int)$settings['point_use_unit']);
-        $pointUse = min($pointUse, $maxPoints);
-        $pointUse = (int)(floor($pointUse / max(1, (int)$settings['point_use_unit'])) * (int)$settings['point_use_unit']);
-    } else {
-        $pointUse = 0;
+        $maxPoints = (int)(floor($maxPoints / $pointUnit) * $pointUnit);
+        $pointUse = $maxPoints;
     }
     $total = max(0, $itemsAmount + $shipping - $pointUse);
     return ['ok' => true, 'live' => (bool)$settings['live_on'], 'lines' => $lines, 'hasProblem' => $hasProblem, 'summary' => ['itemsAmount' => $itemsAmount, 'shippingFee' => $shipping, 'deliveryType' => $delivery, 'pointUsed' => $pointUse, 'total' => $total, 'maxPoints' => $maxPoints, 'remainingForFree' => max(0, (int)$settings['free_shipping_threshold'] - $itemsAmount)]];
@@ -406,9 +431,9 @@ function create_order(array $input): never
         $stmt = $pdo->prepare('INSERT INTO orders (order_no,user_id,status,payment_method,delivery_type,items_amount,shipping_fee,point_used,total_amount,recipient_name,recipient_phone,zipcode,address1,address2,memo,depositor_name,cash_receipt_type,cash_receipt_value,cash_receipt_status,youtube_nickname,reserve_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([$orderNo, $user['id'], 'pending', 'bank', $delivery, $quote['summary']['itemsAmount'], $quote['summary']['shippingFee'], $pointUsed, $quote['summary']['total'], $name, $phone, (string)($recipient['zipcode'] ?? ''), $address1, trim((string)($recipient['address2'] ?? '')), trim((string)($recipient['memo'] ?? '')), trim((string)($input['depositorName'] ?? '')), $receiptType, $receiptValue, $receiptType === 'none' ? 'none' : 'requested', $user['youtube_nickname'] ?? '', $expires]);
         $orderId = (int)$pdo->lastInsertId();
-        $itemStmt = $pdo->prepare('INSERT INTO order_items (order_id,product_id,product_name,unit_price,qty,qty_opened,qty_unopened,line_amount) VALUES (?,?,?,?,?,?,?,?)');
+        $itemStmt = $pdo->prepare('INSERT INTO order_items (order_id,product_id,product_name,package_type,unit_price,qty,qty_opened,qty_unopened,line_amount) VALUES (?,?,?,?,?,?,?,?,?)');
         foreach ($quote['lines'] as $line) {
-            $itemStmt->execute([$orderId, $line['productId'], $line['name'], $line['unitPrice'], $line['qty'], $line['opened'], $line['unopened'], $line['lineAmount']]);
+            $itemStmt->execute([$orderId, $line['productId'], $line['name'], $line['packageType'], $line['unitPrice'], $line['qty'], $line['opened'], $line['unopened'], $line['lineAmount']]);
         }
         $pdo->prepare('INSERT INTO payments (target_type,target_id,method,amount,status) VALUES (?,?,?,?,?)')->execute(['order', $orderId, 'bank', $quote['summary']['total'], 'ready']);
         if (!empty($input['saveAddress'])) {
@@ -470,7 +495,8 @@ function render_checkout(): never
     $settings = setting_values();
     $pointGuide = e((string)$settings['point_guide_text']);
     $body = '<main class="wrap page"><div class="page-title"><h1>주문서</h1></div><div class="panel"><div data-co-lines></div><div class="summary"><div class="sum-row"><span>상품금액</span><span data-sum-items>-</span></div><div class="sum-row"><span>배송비</span><span data-sum-ship>-</span></div><div class="sum-row" data-sum-point-row hidden><span>포인트</span><span data-sum-point>-</span></div><div class="sum-row total"><span>결제금액</span><span data-sum-total>-</span></div></div><p class="hint" data-free-hint></p><form data-addr-form><h2>배송 정보</h2><label class="field"><span>받는 분</span><input name="name" value="' . e($user['name']) . '"></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '"></label><label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label><label class="field"><span>배송 메모</span><input name="memo"></label><label><input type="checkbox" name="saveAddress" checked> 다음에도 이 주소 사용</label><button type="button" class="btn sm" data-edit-addr hidden>주소 수정</button><h2>배송 방법</h2><label><input type="radio" name="delivery" value="direct" checked> 바로배송</label><label><input type="radio" name="delivery" value="keep"> 킵 보관</label><h2>결제 수단</h2><label><input type="radio" name="payment" value="bank" checked> 계좌이체</label><input name="depositorName" placeholder="입금자명"><div data-cash-receipt><h3>현금영수증</h3><label><input type="radio" name="cashReceiptType" value="none" checked> 신청 안 함</label><label><input type="radio" name="cashReceiptType" value="income"> 소득공제용</label><label><input type="radio" name="cashReceiptType" value="expense"> 지출증빙용</label><input name="cashReceiptValue" data-cash-receipt-value placeholder="휴대폰 번호 또는 사업자등록번호" hidden></div><h2>포인트</h2><p class="hint">' . $pointGuide . '</p><input data-point-input name="pointUse" inputmode="numeric" placeholder="사용할 포인트"><button type="button" class="btn sm" data-point-max>최대 사용</button><p class="hint" data-point-hint></p><button type="button" class="btn big block pink" data-place-order>주문하기</button></form></div></main><script>window.GM.freeShip=' . (int)$settings['free_shipping_threshold'] . ';window.GM.shipFee=' . (int)$settings['shipping_fee'] . ';</script>';
-    page('주문서', $body, false, ['/static/js/checkout.js?v=php2']);
+    $body = preg_replace('/<input data-point-input[^>]*><button type="button" class="btn sm" data-point-max>.*?<\/button>/', '<p class="hint">보유 포인트가 10,000P 이상이면 결제 시 10,000P 단위로 자동 사용됩니다.</p>', $body);
+    page('주문서', $body, false, ['/static/js/checkout.js?v=php3']);
 }
 
 function render_order(string $orderNo): never
@@ -487,7 +513,7 @@ function render_order(string $orderNo): never
     $items->execute([$order['id']]);
     $rows = '';
     foreach ($items as $item) {
-        $rows .= '<li>' . e($item['product_name']) . ' × ' . (int)$item['qty'] . ' <span>' . won($item['line_amount']) . '</span></li>';
+        $rows .= '<li>' . e($item['product_name']) . ($item['package_type'] === 'full' ? ' · 풀박' : ($item['package_type'] === 'loose' ? ' · 낱박' : '')) . ' × ' . (int)$item['qty'] . ' <span>' . won($item['line_amount']) . '</span></li>';
     }
     $settings = setting_values();
     $receipt = $order['cash_receipt_type'] === 'none' ? '신청 안 함' : ($order['cash_receipt_type'] === 'income' ? '소득공제용' : '지출증빙용');
@@ -607,7 +633,7 @@ function handle_admin(string $path): never
 
 function admin_product(int $id): never
 {
-    $product = $id ? one_product($id) : ['id' => 0, 'name' => '', 'description' => '', 'section' => 'live', 'price' => 0, 'stock' => 0, 'use_open_option' => 1, 'is_visible' => 1, 'is_soldout' => 0, 'images' => []];
+    $product = $id ? one_product($id) : ['id' => 0, 'name' => '', 'description' => '', 'section' => 'live', 'price' => 0, 'full_box_price' => 0, 'loose_price' => 0, 'stock' => 0, 'use_package_option' => 0, 'use_open_option' => 1, 'is_visible' => 1, 'is_soldout' => 0, 'images' => []];
     if (!$product) {
         http_response_code(404);
         admin_shell('상품 없음', '<div class="card">상품을 찾을 수 없습니다.</div>');
@@ -618,11 +644,11 @@ function admin_product(int $id): never
             flash('ok', '상품을 삭제했습니다.');
             redirect_to('/admin/products');
         }
-        $data = [trim((string)post_value('name')), trim((string)post_value('description')), post_value('section') === 'sample' ? 'sample' : 'live', max(0, (int)post_value('price')), max(0, (int)post_value('stock')), isset($_POST['use_open_option']) ? 1 : 0, isset($_POST['is_visible']) ? 1 : 0, isset($_POST['is_soldout']) ? 1 : 0];
+        $data = [trim((string)post_value('name')), trim((string)post_value('description')), post_value('section') === 'sample' ? 'sample' : 'live', max(0, (int)post_value('price')), max(0, (int)post_value('full_box_price')), max(0, (int)post_value('loose_price')), max(0, (int)post_value('stock')), isset($_POST['use_package_option']) ? 1 : 0, isset($_POST['use_open_option']) ? 1 : 0, isset($_POST['is_visible']) ? 1 : 0, isset($_POST['is_soldout']) ? 1 : 0];
         if ($id) {
-            db()->prepare('UPDATE products SET name=?,description=?,section=?,price=?,stock=?,use_open_option=?,is_visible=?,is_soldout=? WHERE id=?')->execute([...$data, $id]);
+            db()->prepare('UPDATE products SET name=?,description=?,section=?,price=?,full_box_price=?,loose_price=?,stock=?,use_package_option=?,use_open_option=?,is_visible=?,is_soldout=? WHERE id=?')->execute([...$data, $id]);
         } else {
-            $stmt = db()->prepare('INSERT INTO products (name,description,section,price,stock,use_open_option,is_visible,is_soldout,sort_order) VALUES (?,?,?,?,?,?,?,?,?)');
+            $stmt = db()->prepare('INSERT INTO products (name,description,section,price,full_box_price,loose_price,stock,use_package_option,use_open_option,is_visible,is_soldout,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
             $stmt->execute([...$data, (int)db()->query('SELECT COALESCE(MAX(sort_order),0)+10 FROM products')->fetchColumn()]);
             $id = (int)db()->lastInsertId();
         }
@@ -633,6 +659,7 @@ function admin_product(int $id): never
     $imageHtml = '';
     foreach ($product['images'] as $image) $imageHtml .= '<img src="/img/' . (int)$image['id'] . '" alt="" style="max-width:120px;margin:4px">';
     $html = '<div class="page-head"><h1><a href="/admin/products">상품·재고</a> · ' . ($id ? '수정' : '등록') . '</h1></div><form method="post" enctype="multipart/form-data" class="card"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><label class="field"><span>상품명</span><input name="name" value="' . e($product['name']) . '" required></label><label class="field"><span>가격</span><input type="number" name="price" value="' . (int)$product['price'] . '" min="0"></label><label class="field"><span>재고</span><input type="number" name="stock" value="' . (int)$product['stock'] . '" min="0"></label><label class="field"><span>구분</span><select name="section"><option value="live" ' . ($product['section'] !== 'sample' ? 'selected' : '') . '>라이브</option><option value="sample" ' . ($product['section'] === 'sample' ? 'selected' : '') . '>샘플</option></select></label><label class="field"><span>상세 설명</span><textarea name="description" rows="8">' . e($product['description']) . '</textarea></label><label><input type="checkbox" name="use_open_option" ' . ($product['use_open_option'] ? 'checked' : '') . '> 개봉/미개봉 옵션</label><label><input type="checkbox" name="is_visible" ' . ($product['is_visible'] ? 'checked' : '') . '> 고객에게 노출</label><label><input type="checkbox" name="is_soldout" ' . ($product['is_soldout'] ? 'checked' : '') . '> 품절 처리</label><label class="field"><span>상세 이미지 여러 장</span><input type="file" name="images[]" accept="image/*" multiple></label><div>' . $imageHtml . '</div><div class="save-bar">' . ($id ? '<button class="btn danger" name="delete" value="1">삭제</button>' : '') . '<button class="btn pink">저장</button></div></form>';
+    $html = str_replace('<label><input type="checkbox" name="use_open_option"', '<label><input type="checkbox" name="use_package_option" ' . ($product['use_package_option'] ? 'checked' : '') . '> 풀박/낱박 선택 사용</label><label class="field"><span>풀박 가격</span><input type="number" name="full_box_price" value="' . (int)$product['full_box_price'] . '" min="0"><small>풀박스 구성 · 패키지에 모든 상품</small></label><label class="field"><span>낱박 가격</span><input type="number" name="loose_price" value="' . (int)$product['loose_price'] . '" min="0"><small>패키지 내 개별 상품</small></label><label><input type="checkbox" name="use_open_option"', $html);
     admin_shell($id ? $product['name'] : '상품 등록', $html);
 }
 
@@ -686,7 +713,7 @@ function admin_order(int $id): never
     $items = db()->prepare('SELECT * FROM order_items WHERE order_id=?');
     $items->execute([$id]);
     $list = '';
-    foreach ($items as $item) $list .= '<li>' . e($item['product_name']) . ' × ' . (int)$item['qty'] . ' · ' . won($item['line_amount']) . '</li>';
+        foreach ($items as $item) $list .= '<li>' . e($item['product_name']) . ($item['package_type'] === 'full' ? ' · 풀박' : ($item['package_type'] === 'loose' ? ' · 낱박' : '')) . ' × ' . (int)$item['qty'] . ' · ' . won($item['line_amount']) . '</li>';
     $html = '<div class="page-head"><h1>주문 ' . e($order['order_no']) . '</h1></div><div class="card"><p>회원: ' . e($order['login_id']) . '</p><p>상태: ' . e(order_status_label($order)) . '</p><p>받는 분: ' . e($order['recipient_name']) . ' / ' . e($order['recipient_phone']) . '</p><p>주소: ' . e($order['address1']) . ' ' . e($order['address2']) . '</p><p>현금영수증: ' . e((string)$order['cash_receipt_type']) . ' / ' . e((string)$order['cash_receipt_value']) . '</p><ul>' . $list . '</ul><div class="sum-row total">' . won($order['total_amount']) . '</div><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><button class="btn pink" name="action" value="confirm">입금 확인·포인트 적립</button> <button class="btn danger" name="action" value="cancel">주문 취소</button></form></div>';
     admin_shell('주문 상세', $html);
 }

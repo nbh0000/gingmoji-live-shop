@@ -68,7 +68,7 @@
   function cartTotal(cart) { return (cart || load()).reduce(function (s, l) { return s + (l.price || 0) * lineQty(l); }, 0); }
   function toLines(cart) {
     return (cart || load()).map(function (l) {
-      return { productId: l.productId, opened: l.opened || 0, unopened: l.unopened || 0, qty: l.option ? 0 : (l.qty || 0) };
+      return { productId: l.productId, packageType: l.packageType || 'standard', opened: l.opened || 0, unopened: l.unopened || 0, qty: l.option ? 0 : (l.qty || 0) };
     });
   }
 
@@ -273,16 +273,17 @@
     }
     foot.hidden = false;
     var problems = {};
-    if (quote) quote.lines.forEach(function (l) { problems[l.productId] = l; });
+    if (quote) quote.lines.forEach(function (l) { problems[l.productId + ':' + (l.packageType || 'standard')] = l; });
     body.innerHTML = '';
     cart.forEach(function (l, idx) {
-      var q = problems[l.productId];
+      var q = problems[l.productId + ':' + (l.packageType || 'standard')];
       var row = document.createElement('div');
       row.className = 'cart-line';
       row.innerHTML =
         '<div class="thumb">' + (l.imageId ? '<img src="/img/' + l.imageId + '" alt="">' : '<span class="ph">?</span>') + '</div>' +
-        '<div class="info">' +
+          '<div class="info">' +
           '<div class="nm">' + esc(l.name) + '</div>' +
+          (l.packageType && l.packageType !== 'standard' ? '<div class="opt">' + (l.packageType === 'full' ? '풀박 · 풀박스 구성' : '낱박 · 패키지 내 개별 상품') + '</div>' : '') +
           (q && q.problem ? '<div class="problem">' + esc(q.problem) + '</div>' : '') +
           '<div class="ctrl" data-ctrl></div>' +
           '<div class="ctrl"><span class="amt num">' + (l.price != null ? won(l.price * lineQty(l)) : '가격 방송 중 공개') + '</span><button type="button" class="rm">삭제</button></div>' +
@@ -327,9 +328,9 @@
     return api('POST', '/api/cart/quote', { lines: toLines(cart) }).then(function (q) {
       // 최신 가격 반영
       var byId = {};
-      q.lines.forEach(function (l) { byId[l.productId] = l; });
+      q.lines.forEach(function (l) { byId[l.productId + ':' + (l.packageType || 'standard')] = l; });
       cart.forEach(function (l) {
-        var x = byId[l.productId];
+        var x = byId[l.productId + ':' + (l.packageType || 'standard')];
         if (x) { l.price = x.unitPrice; if (x.name) l.name = x.name; if (x.imageId) l.imageId = x.imageId; }
       });
       save(cart);

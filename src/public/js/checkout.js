@@ -31,9 +31,9 @@
       return;
     }
     box.innerHTML = q.lines.map(function (l) {
-      var opt = l.useOpenOption
+      var opt = (l.packageLabel ? l.packageLabel + ' · ' : '') + (l.useOpenOption
         ? [l.opened ? S.OPT.opened + ' ' + l.opened : '', l.unopened ? S.OPT.unopened + ' ' + l.unopened : ''].filter(Boolean).join(' · ')
-        : '수량 ' + l.qty;
+        : '수량 ' + l.qty);
       return '<div class="cart-line">' +
         '<div class="thumb">' + (l.imageId ? '<img src="/img/' + l.imageId + '" alt="">' : '<span class="ph">?</span>') + '</div>' +
         '<div class="info"><div class="nm">' + S.esc(l.name) + '</div><div class="opt">' + S.esc(opt) + '</div>' +

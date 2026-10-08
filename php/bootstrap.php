@@ -61,16 +61,16 @@ function default_settings(): array
         'show_stock' => false,
         'notice_text' => '',
         'event_notice_text' => '5만 원 이상 구매 시 뽑기 1회 제공',
-        'point_earn_mode' => 'tier',
-        'point_earn_rate' => '',
-        'point_earn_threshold' => 300000,
+        'point_earn_mode' => 'flat',
+        'point_earn_rate' => 1,
+        'point_earn_threshold' => 0,
         'point_earn_under_rate' => 1,
-        'point_earn_over_rate' => 3,
-        'point_use_enabled' => false,
+        'point_earn_over_rate' => 1,
+        'point_use_enabled' => true,
         'point_min_balance' => 10000,
         'point_use_unit' => 10000,
         'point_max_ratio' => 100,
-        'point_guide_text' => '포인트는 10,000점 이상부터 사용할 수 있으며, 적립 당일에는 사용할 수 없습니다. 10,000점 단위로 사용하고 잔여 포인트는 누적됩니다.',
+        'point_guide_text' => '포인트는 결제 금액의 1%가 자동 적립되며, 보유 10,000P 이상부터 결제 시 10,000P 단위로 자동 사용됩니다.',
         'cash_receipt_enabled' => true,
         'biz_name' => '깅모지',
         'biz_owner' => '김민정',
@@ -99,6 +99,17 @@ function setting_values(): array
     } catch (Throwable $e) {
         // DB 초기화 전에 기본값으로 화면을 렌더링할 수 있도록 합니다.
     }
+    // 포인트 정책은 카드/현금 구분 없이 1% 자동 적립, 10,000P 이상 자동 사용으로 고정합니다.
+    $cache['point_earn_mode'] = 'flat';
+    $cache['point_earn_rate'] = 1;
+    $cache['point_earn_threshold'] = 0;
+    $cache['point_earn_under_rate'] = 1;
+    $cache['point_earn_over_rate'] = 1;
+    $cache['point_use_enabled'] = true;
+    $cache['point_min_balance'] = 10000;
+    $cache['point_use_unit'] = 10000;
+    $cache['point_max_ratio'] = 100;
+    $cache['point_guide_text'] = '포인트는 결제 금액의 1%가 자동 적립되며, 보유 10,000P 이상부터 결제 시 10,000P 단위로 자동 사용됩니다.';
     return $cache;
 }
 
@@ -254,10 +265,7 @@ function order_status_label(array $o): string
 
 function point_policy(array $s): array
 {
-    $mode = in_array($s['point_earn_mode'] ?? '', ['off', 'flat', 'tier'], true) ? $s['point_earn_mode'] : 'off';
-    if ($mode === 'flat') return ['mode' => $mode, 'rate' => (float)($s['point_earn_rate'] ?? 0)];
-    if ($mode === 'tier') return ['mode' => $mode, 'threshold' => (float)$s['point_earn_threshold'], 'under' => (float)$s['point_earn_under_rate'], 'over' => (float)$s['point_earn_over_rate']];
-    return ['mode' => 'off', 'rate' => 0];
+    return ['mode' => 'flat', 'rate' => 1];
 }
 
 function points_for(float $items, float $used, float $rate): int
@@ -269,7 +277,7 @@ function product_rows(bool $admin = false): array
 {
     $sql = $admin
         ? "SELECT p.*, (SELECT i.id FROM product_images i WHERE i.product_id=p.id ORDER BY i.sort_order,i.id LIMIT 1) image_id, (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=p.id AND o.status='pending') reserved_qty FROM products p WHERE p.deleted_at IS NULL ORDER BY p.sort_order,p.id"
-        : "SELECT p.id,p.name,p.description,p.section,p.price,p.stock,p.use_open_option,p.is_soldout,p.sort_order,(SELECT i.id FROM product_images i WHERE i.product_id=p.id ORDER BY i.sort_order,i.id LIMIT 1) image_id FROM products p WHERE p.deleted_at IS NULL AND p.is_visible=1 ORDER BY p.sort_order,p.id";
+        : "SELECT p.id,p.name,p.description,p.section,p.price,p.full_box_price,p.loose_price,p.stock,p.use_package_option,p.use_open_option,p.is_soldout,p.sort_order,(SELECT i.id FROM product_images i WHERE i.product_id=p.id ORDER BY i.sort_order,i.id LIMIT 1) image_id FROM products p WHERE p.deleted_at IS NULL AND p.is_visible=1 ORDER BY p.sort_order,p.id";
     return db()->query($sql)->fetchAll();
 }
 
