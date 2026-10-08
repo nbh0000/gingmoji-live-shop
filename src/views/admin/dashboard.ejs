@@ -48,7 +48,7 @@
       <dt>배송비</dt><dd><%= fmt.won(s.free_shipping_threshold) %> 이상 무료 / 미만 <%= fmt.won(s.shipping_fee) %></dd>
       <dt>카드 결제 대기</dt><dd><%= s.card_hold_minutes %>분 후 자동 취소</dd>
       <dt>계좌 입금 기한</dt><dd><%= s.bank_auto_cancel_hours > 0 ? s.bank_auto_cancel_hours + '시간 후 자동 취소' : '자동 취소 안 함' %></dd>
-      <dt>포인트 적립</dt><dd><%= s.point_earn_rate ? s.point_earn_rate + '% (계좌이체만)' : '미설정 (적립 안 함)' %></dd>
+      <dt>포인트 적립</dt><dd><%= s.point_earn_mode === 'tier' ? s.point_earn_under_rate + '% / ' + s.point_earn_over_rate + '% (당일 ' + fmt.won(s.point_earn_threshold) + ' 기준)' : (s.point_earn_mode === 'flat' && s.point_earn_rate ? s.point_earn_rate + '% (계좌이체만)' : '미설정 (적립 안 함)') %></dd>
       <dt>카드결제</dt><dd><%= config.portone.enabled ? '사용 가능' : '포트원 키 미설정 → 계좌이체만' %></dd>
     </dl>
     <a class="btn sm ghost" href="/admin/settings" style="margin-top:12px">설정 변경</a>

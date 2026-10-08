@@ -194,7 +194,7 @@ router.get('/orders/export.csv', wrap(async (req, res) => {
     f.params
   );
   const head = ['주문번호', '주문일시', '상태', '유튜브 닉네임', '받는 분', '연락처', '우편번호', '주소', '상세주소', '배송메모', '결제수단', '배송방식',
-    '상품명', '단가', '수량', fmt.OPT.opened, fmt.OPT.unopened, '상품합계', '주문 상품금액', '배송비', '포인트 사용', '결제금액', '입금자명', '결제일시', '택배사', '송장번호'];
+    '상품명', '단가', '수량', fmt.OPT.opened, fmt.OPT.unopened, '상품합계', '주문 상품금액', '배송비', '포인트 사용', '결제금액', '입금자명', '현금영수증 유형', '현금영수증 정보', '결제일시', '택배사', '송장번호'];
   const cell = (v) => {
     const s = v === null || v === undefined ? '' : String(v);
     // 엑셀 수식 주입 방지
@@ -207,7 +207,7 @@ router.get('/orders/export.csv', wrap(async (req, res) => {
       r.order_no, fmt.dt(r.created_at), orders.statusLabel(r), r.youtube_nickname, r.recipient_name, fmt.phone(r.recipient_phone), r.zipcode, r.address1, r.address2, r.memo,
       orders.PAYMENT_LABELS[r.payment_method], orders.DELIVERY_LABELS[r.delivery_type],
       r.product_name, r.unit_price, r.qty, r.use_open_option ? r.qty_opened : '', r.use_open_option ? r.qty_unopened : '', r.line_amount,
-      r.items_amount, r.shipping_fee, r.point_used, r.total_amount, r.depositor_name, fmt.dt(r.paid_at), r.courier, r.tracking_no,
+      r.items_amount, r.shipping_fee, r.point_used, r.total_amount, r.depositor_name, r.cash_receipt_type === 'income' ? '소득공제용' : r.cash_receipt_type === 'expense' ? '지출증빙용' : '', r.cash_receipt_value, fmt.dt(r.paid_at), r.courier, r.tracking_no,
     ].map(cell).join(','));
   }
   const stamp = new Date().toISOString().slice(0, 10);
@@ -511,6 +511,16 @@ router.post('/settings', wrap(async (req, res) => {
   if (values.point_earn_rate !== undefined && values.point_earn_rate !== '' && !Number.isFinite(Number(values.point_earn_rate))) {
     flash(req, 'error', '적립률은 숫자로 입력해 주세요');
     return res.redirect('/admin/settings');
+  }
+  if (!['off', 'flat', 'tier'].includes(values.point_earn_mode)) {
+    flash(req, 'error', '적립 방식을 확인해 주세요');
+    return res.redirect('/admin/settings');
+  }
+  for (const key of ['point_earn_threshold', 'point_earn_under_rate', 'point_earn_over_rate']) {
+    if (values[key] !== undefined && (!Number.isFinite(Number(values[key])) || Number(values[key]) < 0)) {
+      flash(req, 'error', '포인트 적립 기준과 적립률은 0 이상의 숫자로 입력해 주세요');
+      return res.redirect('/admin/settings');
+    }
   }
   await settings.set(values);
   live.invalidate();

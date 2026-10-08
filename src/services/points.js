@@ -2,6 +2,7 @@
 
 const TYPE_LABELS = {
   earn: '적립',
+  adjust: '적립 조정',
   use: '사용',
   revoke: '적립 회수',
   refund: '사용 취소',

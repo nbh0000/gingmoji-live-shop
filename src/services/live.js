@@ -21,6 +21,8 @@ async function build() {
     live: Boolean(s.live_on),
     showPrice,
     notice: s.notice_text || '',
+    eventNotice: s.event_notice_text || '',
+    showStock: Boolean(s.show_stock),
     products: rows.map((p) => ({
       id: p.id,
       stock: Math.max(0, p.stock),

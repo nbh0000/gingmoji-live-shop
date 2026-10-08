@@ -8,6 +8,8 @@
     <div class="form-grid">
       <label class="switch full"><input type="checkbox" name="always_show_price" value="1" <%= s.always_show_price ? 'checked' : '' %>> 가격 항상 노출 (PG 심사 기간용 · 주문은 방송 중에만 가능)</label>
       <label class="field full"><span>고객 화면 공지 (선택)</span><textarea name="notice_text" style="min-height:70px" placeholder="예: 오늘 밤 9시 방송! 계좌이체는 30분 안에 입금해 주세요"><%= s.notice_text %></textarea></label>
+      <label class="field full"><span>이벤트 안내 문구</span><input name="event_notice_text" value="<%= s.event_notice_text %>" placeholder="예: 5만 원 이상 구매 시 뽑기 1회 제공"><small>홈페이지에 노출되며, 이벤트 내용이 바뀌면 여기서 수정할 수 있어요.</small></label>
+      <label class="switch full"><input type="checkbox" name="show_stock" value="1" <%= s.show_stock ? 'checked' : '' %>> 고객에게 재고 수량 표시 (기본값: 품절 여부만 표시)</label>
     </div>
     <p class="muted" style="margin:10px 0 0">방송 시작/종료는 대시보드의 큰 버튼으로 바꿔요.</p>
   </section>
@@ -38,14 +40,26 @@
   </section>
 
   <section class="card">
-    <h2>포인트 <span class="todo" style="font-size:12.5px">TODO 정책 확인</span></h2>
+    <h2>포인트</h2>
     <div class="form-grid">
-      <label class="field"><span>적립률 (%) · 계좌이체 결제 건만</span><input name="point_earn_rate" value="<%= s.point_earn_rate %>" inputmode="decimal" placeholder="비워두면 적립 안 함"><small>관리자가 입금 확인할 때 (상품금액 − 사용 포인트) × 적립률 적립, 취소 시 회수. 카드결제는 적립 없음</small></label>
-      <div></div>
+      <label class="field"><span>적립 방식</span><select name="point_earn_mode"><option value="tier" <%= s.point_earn_mode === 'tier' ? 'selected' : '' %>>당일 합산 금액별 적립</option><option value="flat" <%= s.point_earn_mode === 'flat' ? 'selected' : '' %>>단일 적립률</option><option value="off" <%= s.point_earn_mode === 'off' ? 'selected' : '' %>>적립 안 함</option></select><small>계좌이체 입금 확인 시 적용됩니다. 당일 합산 기준을 넘으면 해당 날짜의 기존 적립도 자동 보정됩니다.</small></label>
+      <label class="field"><span>기존 단일 적립률 (%)</span><input name="point_earn_rate" value="<%= s.point_earn_rate %>" inputmode="decimal" placeholder="단일 적립률 사용 시"><small>단일 적립률 방식을 선택했을 때만 사용됩니다.</small></label>
+      <label class="field"><span>당일 합산 기준 금액 (원)</span><input name="point_earn_threshold" type="number" min="0" step="10000" value="<%= s.point_earn_threshold %>"></label>
+      <label class="field"><span>기준 미만 적립률 (%)</span><input name="point_earn_under_rate" type="number" min="0" step="0.1" value="<%= s.point_earn_under_rate %>"></label>
+      <label class="field"><span>기준 이상 적립률 (%)</span><input name="point_earn_over_rate" type="number" min="0" step="0.1" value="<%= s.point_earn_over_rate %>"></label>
       <label class="switch full"><input type="checkbox" name="point_use_enabled" value="1" <%= s.point_use_enabled ? 'checked' : '' %>> 주문 시 포인트 사용 허용</label>
       <label class="field"><span>최소 보유 포인트</span><input name="point_min_balance" type="number" min="0" value="<%= s.point_min_balance %>"><small>이 이상 보유해야 사용 가능</small></label>
       <label class="field"><span>사용 단위 (P)</span><input name="point_use_unit" type="number" min="1" value="<%= s.point_use_unit %>"><small>예: 100이면 100P 단위로만</small></label>
       <label class="field"><span>최대 사용 비율 (%)</span><input name="point_max_ratio" type="number" min="0" max="100" value="<%= s.point_max_ratio %>"><small>상품금액 대비</small></label>
+      <label class="field full"><span>고객용 포인트 안내</span><textarea name="point_guide_text" style="min-height:80px"><%= s.point_guide_text %></textarea></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>현금영수증</h2>
+    <div class="form-grid">
+      <label class="switch full"><input type="checkbox" name="cash_receipt_enabled" value="1" <%= s.cash_receipt_enabled ? 'checked' : '' %>> 계좌이체 주문에서 현금영수증 신청 받기</label>
+      <p class="muted full" style="margin:0">신청 정보는 주문에 저장되어 관리자 주문 상세에서 확인할 수 있습니다. 실제 발급은 현재 사용 중인 홈택스/PG 발급 절차에 따라 처리해 주세요.</p>
     </div>
   </section>
 

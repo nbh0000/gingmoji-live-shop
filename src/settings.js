@@ -22,14 +22,25 @@ const DEFAULTS = {
   free_shipping_threshold: 80000,
   shipping_fee: 4000,
 
+  // ===== 고객 화면 =====
+  show_stock: false,
+  event_notice_text: '5만 원 이상 구매 시 뽑기 1회 제공',
+
   // ===== 포인트 =====
-  // TODO(정책 확인): 적립률(%). 비어 있으면 적립하지 않음. 계좌이체 결제 건에만 적립
+  // flat은 기존 단일 적립률, tier는 당일 합산 금액 기준 적립률입니다.
+  point_earn_mode: 'tier',
   point_earn_rate: '',
-  // TODO(정책 확인): 포인트 사용 허용 여부와 조건
+  point_earn_threshold: 300000,
+  point_earn_under_rate: 1,
+  point_earn_over_rate: 3,
   point_use_enabled: false,
-  point_min_balance: 0, // 보유 포인트가 이 값 이상일 때만 사용 가능
-  point_use_unit: 1, // 사용 단위(예: 100이면 100P 단위로만 사용)
+  point_min_balance: 10000,
+  point_use_unit: 10000,
   point_max_ratio: 100, // 상품금액 대비 최대 사용 비율(%)
+  point_guide_text: '포인트는 10,000점 이상부터 사용할 수 있으며, 적립 당일에는 사용할 수 없습니다. 10,000점 단위로 사용하고 잔여 포인트는 누적됩니다.',
+
+  // ===== 현금영수증 =====
+  cash_receipt_enabled: true,
 
   // ===== 사업자 정보 (PG 심사용, 하단 노출) =====
   biz_name: '깅모지',
@@ -98,7 +109,12 @@ async function fresh() {
 }
 
 async function set(values) {
-  const entries = Object.entries(values).filter(([k]) => k in DEFAULTS);
+  const nextValues = { ...values };
+  // 기존 API/테스트에서 point_earn_rate만 보내는 경우에도 이전 동작을 유지합니다.
+  if (Object.prototype.hasOwnProperty.call(values, 'point_earn_rate') && !Object.prototype.hasOwnProperty.call(values, 'point_earn_mode')) {
+    nextValues.point_earn_mode = values.point_earn_rate === '' ? 'off' : 'flat';
+  }
+  const entries = Object.entries(nextValues).filter(([k]) => k in DEFAULTS);
   for (const [k, v] of entries) {
     await db.query(
       'INSERT INTO settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)',
@@ -116,4 +132,18 @@ function pointEarnRate() {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-module.exports = { DEFAULTS, TYPES, load, all, get, set, fresh, pointEarnRate };
+function pointEarnPolicy() {
+  const mode = ['off', 'flat', 'tier'].includes(cache.point_earn_mode) ? cache.point_earn_mode : 'off';
+  if (mode === 'flat') return { mode, rate: pointEarnRate() };
+  if (mode === 'tier') {
+    return {
+      mode,
+      threshold: Math.max(0, Number(cache.point_earn_threshold) || 0),
+      underRate: Math.max(0, Number(cache.point_earn_under_rate) || 0),
+      overRate: Math.max(0, Number(cache.point_earn_over_rate) || 0),
+    };
+  }
+  return { mode, rate: null };
+}
+
+module.exports = { DEFAULTS, TYPES, load, all, get, set, fresh, pointEarnRate, pointEarnPolicy };

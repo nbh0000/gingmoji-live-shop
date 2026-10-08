@@ -1,12 +1,12 @@
 <% var out = p.is_soldout || p.stock <= 0; %>
-<button type="button" class="card <%= out ? 'soldout' : '' %>" data-product="<%= p.id %>">
+<a class="card <%= out ? 'soldout' : '' %>" href="/p/<%= p.id %>" data-product="<%= p.id %>">
   <div class="thumb"><% if (p.image_id) { %><img src="/img/<%= p.image_id %>" alt="" loading="lazy"><% } else { %><span class="ph">?</span><% } %></div>
   <div class="name"><%= p.name %></div>
   <div class="row">
     <div>
       <div class="price <%= showPrice ? '' : 'hidden' %>" data-price-label><%= showPrice ? fmt.won(p.price) : '방송 중 공개' %></div>
-      <div class="stock-tag <%= !out && p.stock <= 3 ? 'low' : '' %>" data-stock-label><%= out ? '품절' : (p.stock <= 3 ? '남은 ' + p.stock + '개' : '') %></div>
+      <div class="stock-tag <%= !out && s.show_stock && p.stock <= 3 ? 'low' : '' %>" data-stock-label><%= out ? '품절' : (s.show_stock && p.stock <= 3 ? '남은 ' + p.stock + '개' : '') %></div>
     </div>
     <span class="add-dot" aria-hidden="true">+</span>
   </div>
-</button>
+</a>

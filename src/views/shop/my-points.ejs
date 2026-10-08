@@ -5,7 +5,8 @@
   <section class="panel dark">
     <div style="color:#b9a9ab;font-size:13px">보유 포인트</div>
     <div style="font-family:var(--f-display);font-size:36px;color:var(--pink)" class="num"><%= fmt.num(user.point_balance) %>P</div>
-    <div style="color:#b9a9ab;font-size:13px">계좌이체로 결제한 주문만 입금 확인 시 적립돼요<% if (s.point_earn_rate) { %> (<%= s.point_earn_rate %>%)<% } %>.</div>
+    <div style="color:#b9a9ab;font-size:13px">계좌이체로 결제한 주문만 입금 확인 시 적립돼요.</div>
+    <% if (s.point_guide_text) { %><div style="color:#b9a9ab;font-size:13px;margin-top:7px;white-space:pre-line"><%= s.point_guide_text %></div><% } %>
   </section>
   <section class="panel">
     <h2>내역</h2>

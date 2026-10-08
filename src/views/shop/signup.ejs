@@ -1,6 +1,14 @@
 <%- include('../partials/head', { title: '회원가입', bodyClass: '' }) %>
 <main class="wrap page">
   <div class="page-title"><a class="back" href="/login" aria-label="뒤로">←</a>회원가입</div>
+  <section class="panel">
+    <h2 style="margin:0 0 12px">가입 방법을 선택해 주세요</h2>
+    <div class="stack">
+      <a class="btn big block kakao" href="/auth/kakao">카카오로 가입하기</a>
+      <a class="btn big block google" href="/auth/google">구글로 가입하기</a>
+    </div>
+    <div class="or">또는 아이디로 가입</div>
+  </section>
   <form class="panel" method="post" action="/signup">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <% if (error) { %><div class="err-box"><%= error %></div><% } %>

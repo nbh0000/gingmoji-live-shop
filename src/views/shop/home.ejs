@@ -8,6 +8,7 @@
     <span data-live-text><%= s.live_on ? '지금 방송 중! 담고 바로 주문하세요' : '방송 중에만 주문할 수 있어요. 방송 때 만나요!' %></span>
   </div>
   <% if (s.notice_text) { %><div class="notice"><%= s.notice_text %></div><% } %>
+  <% if (s.event_notice_text) { %><div class="notice"><%= s.event_notice_text %></div><% } %>
 
   <% var liveItems = products.filter(function (p) { return p.section !== 'sample'; });
      var sampleItems = products.filter(function (p) { return p.section === 'sample'; }); %>

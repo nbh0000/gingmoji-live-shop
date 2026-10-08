@@ -145,6 +145,7 @@ body.has-cartbar main.wrap { max-width: 820px; }
   border: 0; text-align: left; font: inherit; color: inherit;
   transition: transform 140ms var(--ease);
 }
+.card { text-decoration: none; color: inherit; }
 .card:active { transform: scale(0.97); }
 .thumb {
   aspect-ratio: 1 / 1;

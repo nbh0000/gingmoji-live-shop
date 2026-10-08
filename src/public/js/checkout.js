@@ -10,6 +10,19 @@
   function delivery() { return ($('input[name="delivery"]:checked') || {}).value || 'direct'; }
   function payment() { return ($('input[name="payment"]:checked') || {}).value || ''; }
   function pointUse() { var el = $('[data-point-input]'); return el ? parseInt(el.value.replace(/[^0-9]/g, ''), 10) || 0 : 0; }
+  function cashReceipt() {
+    var type = ($('input[name="cashReceiptType"]:checked') || {}).value || 'none';
+    return { type: type, value: type === 'none' ? '' : val('cashReceiptValue') };
+  }
+
+  function syncCashReceipt() {
+    var box = $('[data-cash-receipt]');
+    if (!box) return;
+    var type = ($('input[name="cashReceiptType"]:checked') || {}).value || 'none';
+    var value = $('[data-cash-receipt-value]', box);
+    box.hidden = payment() !== 'bank';
+    if (value) value.hidden = payment() !== 'bank' || type === 'none';
+  }
 
   function renderLines(q) {
     var box = $('[data-co-lines]');
@@ -76,9 +89,12 @@
     r.addEventListener('change', function () {
       var dep = $('[data-depositor]');
       if (dep) dep.hidden = payment() !== 'bank';
+      syncCashReceipt();
       syncButton();
     });
   });
+  $$('input[name="cashReceiptType"]').forEach(function (r) { r.addEventListener('change', syncCashReceipt); });
+  syncCashReceipt();
   var pi = $('[data-point-input]');
   if (pi) {
     var t;
@@ -111,6 +127,7 @@
       paymentMethod: payment(),
       pointUse: pointUse(),
       depositorName: val('depositorName'),
+      cashReceipt: cashReceipt(),
       saveAddress: ($('[name="saveAddress"]') || {}).checked || false,
       recipient: { name: val('name'), phone: val('phone'), zipcode: val('zipcode'), address1: val('address1'), address2: val('address2'), memo: val('memo') },
     };

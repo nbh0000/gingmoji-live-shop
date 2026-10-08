@@ -44,11 +44,22 @@
     <h2>결제수단</h2>
     <div class="choices">
       <label class="choice"><input type="radio" name="payment" value="bank" <%= config.portone.enabled ? '' : 'checked' %>>
-        <span class="tile"><span class="t">🏦 계좌이체</span><span class="d"><%= s.bank_name %> 입금<% if (s.point_earn_rate) { %><br>포인트 <%= s.point_earn_rate %>% 적립<% } %></span></span></label>
+        <span class="tile"><span class="t">🏦 계좌이체</span><span class="d"><%= s.bank_name %> 입금<% if (s.point_earn_mode === 'tier') { %><br><%= s.point_earn_under_rate %>%~<%= s.point_earn_over_rate %>% 적립<% } else if (s.point_earn_mode === 'flat' && s.point_earn_rate) { %><br>포인트 <%= s.point_earn_rate %>% 적립<% } %></span></span></label>
       <label class="choice"><input type="radio" name="payment" value="card" <%= config.portone.enabled ? 'checked' : 'disabled' %>>
         <span class="tile"><span class="t">💳 카드결제</span><span class="d"><%= config.portone.enabled ? '바로 결제 완료' : '준비 중이에요' %></span></span></label>
     </div>
-    <%- include('../partials/bank-box', { amountText: '주문하면 입금하실 금액이 안내돼요. 입금이 확인되면 결제완료로 바뀌어요.' }) %>
+  <%- include('../partials/bank-box', { amountText: '주문하면 입금하실 금액이 안내돼요. 입금이 확인되면 결제완료로 바뀌어요.' }) %>
+    <% if (s.cash_receipt_enabled) { %>
+    <div class="cash-receipt" data-cash-receipt>
+      <h3 style="font-size:15px;margin:14px 0 8px">현금영수증 신청</h3>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="cashReceiptType" value="none" checked><span class="tile"><span class="t">신청 안 함</span></span></label>
+        <label class="choice"><input type="radio" name="cashReceiptType" value="income"><span class="tile"><span class="t">소득공제용</span><span class="d">휴대폰 번호</span></span></label>
+        <label class="choice"><input type="radio" name="cashReceiptType" value="expense"><span class="tile"><span class="t">지출증빙용</span><span class="d">사업자등록번호</span></span></label>
+      </div>
+      <label class="field" data-cash-receipt-value hidden style="margin-top:10px"><span>발급 정보</span><input name="cashReceiptValue" inputmode="numeric" placeholder="숫자만 입력해 주세요"></label>
+    </div>
+    <% } %>
   </section>
 
   <% if (s.point_use_enabled) { %>
@@ -61,6 +72,7 @@
     <p class="hint" style="margin:8px 0 0" data-point-hint></p>
   </section>
   <% } %>
+  <% if (s.point_guide_text) { %><p class="hint" style="margin:0 0 14px"><%= s.point_guide_text %></p><% } %>
 
   <section class="panel">
     <h2>결제 금액</h2>

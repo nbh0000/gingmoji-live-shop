@@ -40,6 +40,7 @@ router.get('/api/products/:id', wrap(async (req, res) => {
       description: p.description || '',
       price: live.priceVisible(s) ? p.price : null,
       stock: Math.max(0, p.stock),
+      showStock: Boolean(s.show_stock),
       soldout: Boolean(p.is_soldout) || p.stock <= 0,
       useOpenOption: Boolean(p.use_open_option),
       images: images.map((i) => i.id),
@@ -80,7 +81,7 @@ router.post('/api/cart/quote', wrap(async (req, res) => {
       lines.push({ ...line, name: p.name, problem: e.message });
       continue;
     }
-    const problem = p.is_soldout || p.stock <= 0 ? '품절' : n.qty > p.stock ? `재고 ${p.stock}개 남음` : null;
+    const problem = p.is_soldout || p.stock <= 0 ? '품절' : n.qty > p.stock ? '주문 가능한 수량을 초과했어요' : null;
     lines.push({
       productId: p.id,
       name: p.name,
@@ -135,6 +136,7 @@ router.post('/api/orders', requireUser, wrap(async (req, res) => {
         paymentMethod: b.paymentMethod,
         recipient: b.recipient,
         depositorName: b.depositorName,
+        cashReceipt: b.cashReceipt,
         pointUse: b.pointUse,
       },
       { cardEnabled: config.portone.enabled }

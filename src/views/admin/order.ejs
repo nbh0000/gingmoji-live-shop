@@ -13,6 +13,7 @@
         <dt>결제수단</dt><dd><span class="chip <%= o.payment_method %>"><%= L.payment[o.payment_method] %></span></dd>
         <dt>배송방식</dt><dd><span class="chip <%= o.delivery_type %>"><%= L.delivery[o.delivery_type] %></span><% if (sr) { %> · <a href="/admin/shipments/<%= sr.id %>">출고요청 <%= sr.request_no %></a><% } %></dd>
         <% if (o.payment_method === 'bank') { %><dt>입금자명</dt><dd><%= o.depositor_name %></dd><% } %>
+        <% if (o.cash_receipt_type && o.cash_receipt_type !== 'none') { %><dt>현금영수증</dt><dd><%= o.cash_receipt_type === 'income' ? '소득공제용' : '지출증빙용' %> · <span class="num"><%= o.cash_receipt_value %></span></dd><% } %>
         <% if (o.paid_at) { %><dt>결제일시</dt><dd class="num"><%= fmt.dt(o.paid_at) %></dd><% } %>
         <% if (o.reserve_expires_at && o.status === 'pending') { %><dt>재고 선점 만료</dt><dd class="num"><%= fmt.dt(o.reserve_expires_at) %></dd><% } %>
         <% if (o.status === 'cancelled') { %><dt>취소</dt><dd><%= fmt.dt(o.cancelled_at) %> · <%= L.cancel[o.cancel_reason] || o.cancel_reason %></dd><% } %>
@@ -57,6 +58,7 @@
         <dt>주소</dt><dd><%= o.zipcode ? '(' + o.zipcode + ') ' : '' %><%= o.address1 %> <%= o.address2 %></dd>
         <dt>배송 메모</dt><dd><%= o.memo || '-' %></dd>
         <dt>회원</dt><dd><%= u.name %> · <%= u.login_id || (u.kakao_id ? '카카오' : '구글') %></dd>
+        <% if (o.cash_receipt_type && o.cash_receipt_type !== 'none') { %><dt>현금영수증</dt><dd><%= o.cash_receipt_type === 'income' ? '소득공제용' : '지출증빙용' %> · <span class="num"><%= o.cash_receipt_value %></span></dd><% } %>
       </dl>
     </section>
 

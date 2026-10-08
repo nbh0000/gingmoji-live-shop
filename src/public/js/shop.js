@@ -149,7 +149,7 @@
     minus.addEventListener('click', function () { if (value > min) { value--; sync(); onChange(value); } });
     plus.addEventListener('click', function () {
       if (value < max()) { value++; sync(); onChange(value); }
-      else toast('남은 재고를 모두 담았어요', 'error');
+      else toast('더 담을 수 없는 상품이에요', 'error');
     });
     wrap.sync = sync;
     sync();
@@ -177,7 +177,7 @@
         '<div class="p-name" id="ps-name">' + esc(p.name) + '</div>' +
         (p.price != null ? '<div class="p-price">' + won(p.price) + '</div>' : '<div class="price hidden">가격은 방송 중에 공개돼요</div>') +
         '<div class="p-meta">' +
-          (p.soldout ? '<span class="chip gray">품절</span>' : '<span class="chip">재고 ' + p.stock + '개</span>') +
+          (p.soldout ? '<span class="chip gray">품절</span>' : (p.showStock ? '<span class="chip">재고 ' + p.stock + '개</span>' : '')) +
           (already ? '<span class="chip gray">장바구니에 ' + already + '개</span>' : '') +
         '</div>' +
         (p.description ? '<div class="p-desc">' + esc(p.description) + '</div>' : '') +
@@ -219,7 +219,7 @@
     btn.disabled = false;
     if (!GM.live) { btn.textContent = '방송 중에만 주문할 수 있어요'; btn.disabled = true; return; }
     if (p.soldout) { btn.textContent = '품절된 상품이에요'; btn.disabled = true; return; }
-    if (psState.already >= p.stock) { btn.textContent = '남은 재고를 모두 담았어요'; btn.disabled = true; return; }
+    if (psState.already >= p.stock) { btn.textContent = '더 담을 수 없는 상품이에요'; btn.disabled = true; return; }
     if (n < 1) { btn.textContent = p.useOpenOption ? '개봉 방법과 수량을 골라 주세요' : '수량을 골라 주세요'; btn.disabled = true; return; }
     btn.innerHTML = n + '개 담기' + (p.price != null ? ' <span class="sub">' + won(p.price * n) + '</span>' : '');
   }
@@ -249,7 +249,10 @@
   }
 
   $$('[data-product]').forEach(function (card) {
-    card.addEventListener('click', function () { openProduct(Number(card.getAttribute('data-product'))); });
+    // 홈 상품 카드는 상세페이지 링크로 동작합니다. 상세페이지에서 ?p=로 돌아온 경우에만 시트를 엽니다.
+    if (card.tagName.toLowerCase() !== 'a') {
+      card.addEventListener('click', function () { openProduct(Number(card.getAttribute('data-product'))); });
+    }
   });
   var qp = new URLSearchParams(location.search).get('p');
   if (qp && $('[data-grid]')) openProduct(Number(qp));
@@ -368,8 +371,8 @@
       }
       var sl = $('[data-stock-label]', card);
       if (sl) {
-        sl.textContent = p.soldout ? '품절' : (p.stock <= 3 ? '남은 ' + p.stock + '개' : '');
-        sl.classList.toggle('low', !p.soldout && p.stock <= 3);
+        sl.textContent = p.soldout ? '품절' : (j.showStock && p.stock <= 3 ? '남은 ' + p.stock + '개' : '');
+        sl.classList.toggle('low', j.showStock && !p.soldout && p.stock <= 3);
       }
     });
     if (changed) {

@@ -51,7 +51,7 @@
             <% o.items.forEach(function (it) { %><div><%= it.product_name %> ×<%= it.qty %><% if (it.qty_opened || it.qty_unopened) { %> <span class="opt">(<%= fmt.OPT.short.opened %> <%= it.qty_opened %> / <%= fmt.OPT.short.unopened %> <%= it.qty_unopened %>)</span><% } %></div><% }) %>
           </td>
           <td class="right"><div class="amount num"><%= fmt.won(o.total_amount) %></div><% if (o.shipping_fee) { %><div class="muted num" style="font-size:12px">배송비 <%= fmt.num(o.shipping_fee) %></div><% } %><% if (o.point_used) { %><div class="muted num" style="font-size:12px">포인트 -<%= fmt.num(o.point_used) %></div><% } %></td>
-          <td><span class="chip <%= o.payment_method %>"><%= L.payment[o.payment_method] %></span><br><span class="chip <%= o.delivery_type %>" style="margin-top:4px"><%= L.delivery[o.delivery_type] %></span></td>
+          <td><span class="chip <%= o.payment_method %>"><%= L.payment[o.payment_method] %></span><br><span class="chip <%= o.delivery_type %>" style="margin-top:4px"><%= L.delivery[o.delivery_type] %></span><% if (o.cash_receipt_type && o.cash_receipt_type !== 'none') { %><div class="muted" style="font-size:12px;margin-top:4px">현금영수증 신청</div><% } %></td>
           <td><span class="chip <%= o.status %>"><%= orderStatus(o) %></span><% if (o.tracking_no) { %><div class="muted" style="font-size:12px;margin-top:4px"><%= o.courier %> <%= o.tracking_no %></div><% } %></td>
           <td class="num muted nowrap"><%= fmt.dt(o.created_at) %></td>
           <td>

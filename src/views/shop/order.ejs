@@ -41,6 +41,7 @@
       <dt>주문일시</dt><dd class="num"><%= fmt.dt(o.created_at) %></dd>
       <dt>배송방식</dt><dd><%= o.delivery_type === 'keep' ? '킵 (보관)' : '바로배송' %></dd>
       <dt>결제수단</dt><dd><%= o.payment_method === 'card' ? '카드결제' : '계좌이체' %></dd>
+      <% if (o.cash_receipt_type && o.cash_receipt_type !== 'none') { %><dt>현금영수증</dt><dd><%= o.cash_receipt_type === 'income' ? '소득공제용' : '지출증빙용' %> 신청</dd><% } %>
       <% if (o.tracking_no) { %><dt>송장</dt><dd><%= o.courier %> <%= o.tracking_no %></dd><% } %>
       <% if (o.status === 'cancelled') { %><dt>취소</dt><dd><%= fmt.dt(o.cancelled_at) %></dd><% } %>
     </dl>

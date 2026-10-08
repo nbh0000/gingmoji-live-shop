@@ -10,7 +10,7 @@
     <h1 class="p-name"><%= p.name %></h1>
     <div class="<%= showPrice ? 'p-price' : 'price hidden' %>"><%= showPrice ? fmt.won(p.price) : '가격은 방송 중에 공개됩니다' %></div>
     <div class="p-meta">
-      <% if (p.is_soldout || p.stock <= 0) { %><span class="chip gray">품절</span><% } else { %><span class="chip">재고 <%= p.stock %>개</span><% } %>
+      <% if (p.is_soldout || p.stock <= 0) { %><span class="chip gray">품절</span><% } else if (s.show_stock) { %><span class="chip">재고 <%= p.stock %>개</span><% } %>
       <% if (p.use_open_option) { %><span class="chip gray">라이브 개봉 / 미개봉 발송 선택</span><% } %>
     </div>
     <% if (p.description) { %><div class="p-desc"><%= p.description %></div><% } %>
