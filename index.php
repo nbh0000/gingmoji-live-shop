@@ -252,7 +252,7 @@ function handle_shop(string $path): never
 HTML;
         $detailScript = str_replace(['__PRICE__', '__MAX__', '__LIVE__', '__OPTION__', '__PACKAGE__', '__FULL_PRICE__', '__LOOSE_PRICE__', '__SHOW_PRICE__', '__ID__', '__NAME__', '__IMAGE__'], [(string)$detailPrice, (string)$detailMax, $s['live_on'] ? 'true' : 'false', $detailHasOption, $hasPackageOption ? 'true' : 'false', (string)$fullBoxPrice, (string)$loosePrice, 'true', (string)$detailId, $detailName, (string)$detailImage], $detailScript);
         $body .= $detailScript;
-        page($product['name'], $body);
+        page($product['name'], shop_body($body, true));
     }
 
     if ($path === '/login') {
