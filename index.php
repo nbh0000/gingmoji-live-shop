@@ -614,13 +614,20 @@ function render_my(string $path): never
         $name = trim((string)post_value('name'));
         $phone = trim((string)post_value('phone'));
         $youtube = trim((string)post_value('youtube_nickname'));
+        $newPassword = (string)post_value('new_password');
         $zipcode = trim((string)post_value('zipcode'));
         $address1 = trim((string)post_value('address1'));
         $address2 = trim((string)post_value('address2'));
         if ($name === '' || $phone === '' || $youtube === '') {
             flash('error', '성함, 휴대폰, 유튜브 닉네임을 입력해 주세요.');
+        } elseif ($newPassword !== '' && strlen($newPassword) < 8) {
+            flash('error', '새 비밀번호는 8자 이상 입력해 주세요.');
         } else {
-            db()->prepare('UPDATE users SET name=?,phone=?,youtube_nickname=?,zipcode=?,address1=?,address2=?,profile_completed=1 WHERE id=?')->execute([$name, $phone, $youtube, $zipcode, $address1, $address2, $user['id']]);
+            if ($newPassword !== '') {
+                db()->prepare('UPDATE users SET password_hash=?,name=?,phone=?,youtube_nickname=?,zipcode=?,address1=?,address2=?,profile_completed=1 WHERE id=?')->execute([password_hash($newPassword, PASSWORD_DEFAULT), $name, $phone, $youtube, $zipcode, $address1, $address2, $user['id']]);
+            } else {
+                db()->prepare('UPDATE users SET name=?,phone=?,youtube_nickname=?,zipcode=?,address1=?,address2=?,profile_completed=1 WHERE id=?')->execute([$name, $phone, $youtube, $zipcode, $address1, $address2, $user['id']]);
+            }
             flash('ok', '회원 정보가 수정되었습니다.');
             redirect_to('/my');
         }
@@ -645,8 +652,8 @@ function render_my(string $path): never
         $orderRows .= '<a class="item my-order-item" href="/orders/' . e($order['order_no']) . '"><div class="top-row"><strong>' . e($order['order_no']) . '</strong><span class="meta">' . e(dt($order['created_at'])) . '</span></div><div class="my-order-row"><span>' . e($deliveryLabel . ' · ' . order_status_label($order)) . '</span><b>' . won($order['total_amount']) . '</b></div></a>';
     }
 
-    $profile = '<form method="post" class="profile-form"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="profile"><div class="profile-grid"><label class="field"><span>아이디</span><input value="' . e($user['login_id']) . '" readonly></label><label class="field"><span>성함</span><input name="name" value="' . e($user['name']) . '" required></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '" required></label><label class="field"><span>유튜브 닉네임</span><input name="youtube_nickname" value="' . e($user['youtube_nickname']) . '" required></label></div><label class="field"><span>주소</span><div class="field-row address-search-row"><input class="grow" name="zipcode" data-signup-zipcode value="' . e($user['zipcode']) . '" placeholder="우편번호" readonly><button type="button" class="btn small ghost" data-address-search>주소 검색</button></div><input name="address1" data-signup-address value="' . e($user['address1']) . '" placeholder="주소 검색으로 입력" readonly><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소" autocomplete="street-address"></label><button class="btn big block pink">회원 정보 저장</button></form>';
-    $keepSummary = $keptRows ? '<p class="hint">현재 <strong>' . won($keptAmount) . '</strong> 보관 중이에요. 상품을 더 담은 뒤 주문서에서 <strong>킵 상품 같이 배송받기</strong>를 선택할 수 있어요.</p>' : '<p class="my-empty">현재 보관 중인 킵 상품이 없어요.</p>';
+    $profile = '<form method="post" class="profile-form"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="profile"><div class="profile-grid"><label class="field"><span>아이디</span><input value="' . e($user['login_id']) . '" readonly></label><label class="field"><span>성함</span><input name="name" value="' . e($user['name']) . '" required></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '" required></label><label class="field"><span>유튜브 닉네임</span><input name="youtube_nickname" value="' . e($user['youtube_nickname']) . '" required></label><label class="field"><span>새 비밀번호</span><input name="new_password" type="password" minlength="8" placeholder="변경할 때만 입력" autocomplete="new-password"></label></div><label class="field"><span>주소</span><div class="field-row address-search-row"><input class="grow" name="zipcode" data-signup-zipcode value="' . e($user['zipcode']) . '" placeholder="우편번호" readonly><button type="button" class="btn small ghost" data-address-search>주소 검색</button></div><input name="address1" data-signup-address value="' . e($user['address1']) . '" placeholder="주소 검색으로 입력" readonly><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소" autocomplete="street-address"></label><button class="btn big block pink">회원 정보 저장</button></form>';
+    $keepSummary = $keptRows ? '<p class="hint">현재 <strong>' . won($keptAmount) . '</strong> 보관 중이에요. 상품을 더 담은 뒤 주문서에서 <strong>킵 상품 같이 배송받기</strong>를 선택할 수 있어요. 누적 ' . won($settings['free_shipping_threshold']) . ' 이상이면 배송비가 무료예요.</p>' : '<p class="my-empty">현재 보관 중인 킵 상품이 없어요.</p>';
     $body = '<main class="wrap page"><div class="page-title"><h1>마이페이지</h1></div><section class="panel profile-panel"><div class="my-heading"><div><h2>' . e($user['name'] ?: $user['login_id']) . '님</h2><p class="hint">가입 정보를 확인하고 수정할 수 있어요.</p></div><div class="my-heading-actions"><a class="btn sm soft" href="/my/points">포인트 ' . num($user['point_balance']) . 'P</a><a class="btn sm" href="/logout">로그아웃</a></div></div>' . $profile . '</section><section class="panel my-section"><div class="section-head"><h2>킵 보관함</h2><a class="btn sm ghost" href="/">상품 더 담기</a></div>' . $keepSummary . '<div class="list">' . ($keptRows ?: '') . '</div></section><section class="panel my-section"><h2>최근 주문</h2><div class="list">' . ($orderRows ?: '<p class="my-empty">아직 주문 내역이 없어요.</p>') . '</div></section></main>';
     page('마이페이지', shop_body($body, true), false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1']);
 }
