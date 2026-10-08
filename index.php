@@ -14,6 +14,7 @@ try {
 check_csrf();
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $path = '/' . trim($path, '/');
+$path = preg_replace('#^/index\.php(?=/|$)#', '', $path) ?: '/';
 if ($path !== '/') {
     $path = rtrim($path, '/');
 }
@@ -34,7 +35,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php3' : '/static/css/shop.css?v=php3';
+    $css = $admin ? '/static/css/admin.css?v=php3' : '/static/css/shop.css?v=php5';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -64,7 +65,8 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
         'opt' => ['opened' => '라이브 개봉', 'unopened' => '미개봉 발송'],
     ];
     echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#141011"><title>' . ($title ? e($title) . ' · ' : '') . '깅모지 LIVE</title><meta name="description" content="깅모지 라이브 상품 주문 사이트"><link rel="stylesheet" href="' . $css . '"><meta name="csrf" content="' . e(csrf_token()) . '"></head><body class="' . ($title === '' ? 'has-cartbar' : '') . '">';
-    echo '<header class="top"><div class="wrap top-in"><a class="brand" href="/">깅모지<span class="q">♥</span></a><div class="top-actions"><span class="live-pill ' . ($s['live_on'] ? 'on' : '') . '" data-live-pill>' . ($s['live_on'] ? 'LIVE' : 'OFF') . '</span><a class="icon-btn" href="' . ($user ? '/my' : '/login') . '" aria-label="' . ($user ? '마이페이지' : '로그인') . '">◎</a><button class="icon-btn" type="button" data-open-cart aria-label="장바구니">🛒<span class="badge" data-cart-count hidden>0</span></button></div></div></header>';
+    $accountLinks = $user ? '<a class="top-link" href="/my">마이페이지</a><a class="top-link" href="/logout">로그아웃</a>' : '<a class="top-link" href="/login">로그인</a><a class="top-link" href="/signup">회원가입</a>';
+    echo '<header class="top"><div class="wrap top-in"><a class="brand" href="/">깅모지<span class="q">♥</span></a><div class="top-actions"><div class="account-links">' . $accountLinks . '</div><span class="live-pill ' . ($s['live_on'] ? 'on' : '') . '" data-live-pill>' . ($s['live_on'] ? 'LIVE' : 'OFF') . '</span><button class="icon-btn" type="button" data-open-cart aria-label="장바구니">🛒<span class="badge" data-cart-count hidden>0</span></button></div></div></header>';
     if ($flash) {
         echo '<div class="toast show ' . ($flash[0] === 'error' ? 'error' : '') . '" data-flash role="status">' . e($flash[1]) . '</div>';
     }
@@ -124,7 +126,7 @@ function handle_shop(string $path): never
         if (!$gallery) {
             $gallery = '<div class="thumb"><span class="ph">이미지 없음</span></div>';
         }
-        $body = '<main class="wrap page"><div class="page-title"><a class="back" href="/">←</a></div><div class="panel"><div class="p-gallery">' . $gallery . '</div><h1 class="p-name">' . e($product['name']) . '</h1><div class="' . ($showPrice ? 'p-price' : 'price hidden') . '">' . ($showPrice ? won($product['price']) : '가격은 방송 중 공개됩니다') . '</div><div class="p-meta">';
+        $body = '<main class="detail-page"><div class="detail-breadcrumb"><a href="/">HOME</a><span>/</span><span>' . e($product['name']) . '</span></div><div class="detail-layout"><section class="detail-media"><div class="p-gallery detail-gallery">' . $gallery . '</div></section><section class="detail-info"><p class="detail-kicker">GINGMOJI COLLECTION</p><h1 class="p-name">' . e($product['name']) . '</h1><div class="' . ($showPrice ? 'p-price' : 'price hidden') . '">' . ($showPrice ? won($product['price']) : '가격은 방송 중 공개됩니다') . '</div><div class="p-meta">';
         if ((int)$product['is_soldout'] || (int)$product['stock'] <= 0) {
             $body .= '<span class="chip gray">품절</span>';
         } elseif ($s['show_stock']) {
@@ -134,8 +136,90 @@ function handle_shop(string $path): never
         if ($product['description']) {
             $body .= '<div class="p-desc">' . nl2br(e($product['description'])) . '</div>';
         }
-        $body .= '<div class="opt-box"><label>수량 <input id="detailQty" type="number" min="1" max="' . (int)$product['stock'] . '" value="1"></label><button class="btn big" type="button" id="detailAdd">장바구니 담기</button></div></div></main>';
-        $body .= '<script>(function(){var b=document.getElementById("detailAdd");if(!b)return;b.addEventListener("click",function(){var q=Math.max(1,parseInt(document.getElementById("detailQty").value||"1",10));var c=[];try{c=JSON.parse(localStorage.getItem("gm_cart_v1"))||[]}catch(e){}var l=c.find(function(x){return Number(x.productId)===' . (int)$product['id'] . '});if(!l){l={productId:' . (int)$product['id'] . ',name:' . json_encode($product['name'], JSON_UNESCAPED_UNICODE) . ',price:' . (int)$product['price'] . ',imageId:' . (!empty($product['images'][0]['id']) ? (int)$product['images'][0]['id'] : 'null') . ',option:false,qty:0}}l.qty=(l.qty||0)+q;c=c.filter(function(x){return Number(x.productId)!==' . (int)$product['id'] . '});c.push(l);localStorage.setItem("gm_cart_v1",JSON.stringify(c));location.href="/checkout";});})();</script>';
+        $optionHtml = '';
+        if ($product['use_open_option']) {
+            $optionHtml = '<div class="detail-option-label"><strong>개봉 방법을 골라 주세요</strong><span>수량별로 나눠 담을 수 있어요</span></div><div class="detail-option-row"><div><strong>라이브 개봉</strong><small>방송에서 바로 개봉해 드려요</small></div><div class="detail-stepper"><button type="button" id="detailOpenedMinus" aria-label="라이브 개봉 수량 줄이기">−</button><output id="detailOpenedQty">0</output><button type="button" id="detailOpenedPlus" aria-label="라이브 개봉 수량 늘리기">+</button></div></div><div class="detail-option-row"><div><strong>미개봉 발송</strong><small>포장 그대로 보내 드려요</small></div><div class="detail-stepper"><button type="button" id="detailUnopenedMinus" aria-label="미개봉 발송 수량 줄이기">−</button><output id="detailUnopenedQty">0</output><button type="button" id="detailUnopenedPlus" aria-label="미개봉 발송 수량 늘리기">+</button></div></div>';
+        } else {
+            $optionHtml = '<div class="detail-field"><span>수량</span><div class="detail-qty"><button type="button" id="detailMinus" aria-label="수량 줄이기">−</button><input id="detailQty" type="number" min="1" max="' . max(1, (int)$product['stock']) . '" value="1"><button type="button" id="detailPlus" aria-label="수량 늘리기">+</button></div></div>';
+        }
+        $body .= '<div class="detail-option-box">' . $optionHtml . '</div><div class="detail-total"><span>TOTAL</span><strong id="detailTotal">' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</strong></div><div class="detail-actions"><button class="detail-wish" type="button" aria-label="찜하기">♡</button><button class="btn big block" type="button" id="detailAdd">장바구니 담기</button></div></section></div><nav class="detail-tabs" aria-label="상품 상세 메뉴"><a class="on" href="#detail-description">DETAIL</a><a href="#detail-guide">GUIDE</a><a href="#detail-review">REVIEW (0)</a><a href="#detail-qna">Q&A (0)</a></nav><section class="detail-description" id="detail-description"><h2>상품 상세정보</h2>' . ($product['description'] ? '<div class="p-desc">' . nl2br(e($product['description'])) . '</div>' : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>') . '</section><section class="detail-description detail-guide" id="detail-guide"><h2>구매 안내</h2><p>방송 상품은 방송 중 주문할 수 있습니다. 상품별 옵션과 배송 안내를 확인해 주세요.</p></section></main>';
+        $detailId = (int)$product['id'];
+        $detailName = json_encode($product['name'], JSON_UNESCAPED_UNICODE);
+        $detailImage = !empty($product['images'][0]['id']) ? (int)$product['images'][0]['id'] : 'null';
+        $detailPrice = (int)$product['price'];
+        $detailMax = max(1, (int)$product['stock']);
+        $detailHasOption = $product['use_open_option'] ? 'true' : 'false';
+        $detailScript = <<<'HTML'
+<script>
+(function () {
+  var add = document.getElementById('detailAdd');
+  if (!add) return;
+  var price = __PRICE__;
+  var max = __MAX__;
+  var hasOption = __OPTION__;
+  var total = document.getElementById('detailTotal');
+  var opened = 0;
+  var unopened = 0;
+  var qty = 1;
+  function sync() {
+    var count = hasOption ? opened + unopened : qty;
+    if (hasOption) {
+      document.getElementById('detailOpenedQty').textContent = opened;
+      document.getElementById('detailUnopenedQty').textContent = unopened;
+      document.getElementById('detailOpenedMinus').disabled = opened <= 0;
+      document.getElementById('detailUnopenedMinus').disabled = unopened <= 0;
+      document.getElementById('detailOpenedPlus').disabled = count >= max;
+      document.getElementById('detailUnopenedPlus').disabled = count >= max;
+    } else {
+      var input = document.getElementById('detailQty');
+      input.value = qty;
+      document.getElementById('detailMinus').disabled = qty <= 1;
+      document.getElementById('detailPlus').disabled = qty >= max;
+    }
+    total.textContent = __SHOW_PRICE__ ? (price * count).toLocaleString('ko-KR') + '원' : '방송 중 공개';
+    add.disabled = count < 1;
+    add.textContent = count ? count + '개 담기' : '수량을 골라 주세요';
+  }
+  function change(kind, delta) {
+    if (kind === 'opened') opened = Math.max(0, Math.min(max - unopened, opened + delta));
+    if (kind === 'unopened') unopened = Math.max(0, Math.min(max - opened, unopened + delta));
+    sync();
+  }
+  if (hasOption) {
+    document.getElementById('detailOpenedMinus').addEventListener('click', function () { change('opened', -1); });
+    document.getElementById('detailOpenedPlus').addEventListener('click', function () { change('opened', 1); });
+    document.getElementById('detailUnopenedMinus').addEventListener('click', function () { change('unopened', -1); });
+    document.getElementById('detailUnopenedPlus').addEventListener('click', function () { change('unopened', 1); });
+  } else {
+    document.getElementById('detailMinus').addEventListener('click', function () { qty = Math.max(1, qty - 1); sync(); });
+    document.getElementById('detailPlus').addEventListener('click', function () { qty = Math.min(max, qty + 1); sync(); });
+    document.getElementById('detailQty').addEventListener('input', function () { qty = Math.max(1, Math.min(max, parseInt(this.value || '1', 10) || 1)); sync(); });
+  }
+  add.addEventListener('click', function () {
+    var count = hasOption ? opened + unopened : qty;
+    if (!count) return;
+    var cart = [];
+    try { cart = JSON.parse(localStorage.getItem('gm_cart_v1')) || []; } catch (e) {}
+    var line = cart.find(function (item) { return Number(item.productId) === __ID__; });
+    if (!line) {
+      line = { productId: __ID__, name: __NAME__, price: price, imageId: __IMAGE__, option: hasOption, opened: 0, unopened: 0, qty: 0 };
+      cart.push(line);
+    }
+    if (hasOption) {
+      line.opened = (line.opened || 0) + opened;
+      line.unopened = (line.unopened || 0) + unopened;
+    } else {
+      line.qty = (line.qty || 0) + qty;
+    }
+    localStorage.setItem('gm_cart_v1', JSON.stringify(cart));
+    location.href = '/checkout';
+  });
+  sync();
+})();
+</script>
+HTML;
+        $detailScript = str_replace(['__PRICE__', '__MAX__', '__OPTION__', '__SHOW_PRICE__', '__ID__', '__NAME__', '__IMAGE__'], [(string)$detailPrice, (string)$detailMax, $detailHasOption, $showPrice ? 'true' : 'false', (string)$detailId, $detailName, (string)$detailImage], $detailScript);
+        $body .= $detailScript;
         page($product['name'], $body);
     }
 
