@@ -4,6 +4,7 @@
   var GM = window.GM || {};
   var OPT = GM.opt || { opened: '라이브 개봉', unopened: '미개봉 발송' };
   var KEY = 'gm_cart_v1';
+  var footerVisible = false;
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var won = function (n) { return Number(n || 0).toLocaleString('ko-KR') + '원'; };
@@ -77,14 +78,34 @@
     $$('[data-cart-count]').forEach(function (el) { el.textContent = n; el.hidden = n === 0; });
     var bar = $('[data-cartbar]');
     if (bar) {
-      bar.classList.toggle('show', n > 0);
+      bar.classList.toggle('show', n > 0 && !footerVisible);
       var t = $('[data-cartbar-text]', bar);
       if (t) t.textContent = n + '개' + (GM.showPrice ? ' · ' + won(cartTotal()) : '');
     }
   }
 
   // ===== 바텀시트 =====
+  function watchFooter() {
+    var footer = $('.foot');
+    if (!footer) return;
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries) {
+        footerVisible = !!(entries[0] && entries[0].isIntersecting);
+        renderBadge();
+      }, { rootMargin: '0px 0px 80px 0px', threshold: 0 }).observe(footer);
+      return;
+    }
+    var check = function () {
+      var rect = footer.getBoundingClientRect();
+      footerVisible = rect.top < window.innerHeight + 80 && rect.bottom > 0;
+      renderBadge();
+    };
+    window.addEventListener('scroll', check, { passive: true });
+    check();
+  }
+
   document.addEventListener('gm:cart-updated', renderBadge);
+  watchFooter();
   var backdrop = $('[data-backdrop]');
   var openSheetEl = null;
   function openSheet(el) {
