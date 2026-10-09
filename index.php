@@ -35,7 +35,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php4' : '/static/css/shop.css?v=php8';
+    $css = $admin ? '/static/css/admin.css?v=php5' : '/static/css/shop.css?v=php8';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -704,7 +704,32 @@ function handle_admin(string $path): never
     if ($path === '/admin') {
         $counts = ['products' => (int)db()->query('SELECT COUNT(*) FROM products WHERE deleted_at IS NULL')->fetchColumn(), 'orders' => (int)db()->query('SELECT COUNT(*) FROM orders WHERE status = "pending"')->fetchColumn(), 'users' => (int)db()->query('SELECT COUNT(*) FROM users')->fetchColumn()];
         $s = setting_values();
-        admin_shell('대시보드', '<div class="page-head"><h1>대시보드</h1></div><div class="stats"><div class="stat"><b>' . $counts['products'] . '</b><span>상품</span></div><div class="stat"><b>' . $counts['orders'] . '</b><span>입금 대기</span></div><div class="stat"><b>' . $counts['users'] . '</b><span>회원</span></div></div><div class="card"><h2>방송 상태</h2><p>' . ($s['live_on'] ? 'LIVE' : 'OFF') . '</p><form method="post" action="/admin/live"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="on" value="' . ($s['live_on'] ? '0' : '1') . '"><button class="btn pink">' . ($s['live_on'] ? '방송 종료' : '방송 시작') . '</button></form></div>');
+        $paidStatuses = "'paid','kept','preparing','shipped'";
+        $dailyStmt = db()->query("SELECT DATE(paid_at) AS sale_date, COUNT(*) AS order_count, COALESCE(SUM(total_amount),0) AS revenue, COALESCE(SUM(items_amount),0) AS items_amount FROM orders WHERE paid_at IS NOT NULL AND status IN ($paidStatuses) AND paid_at >= CURRENT_DATE - INTERVAL 6 DAY GROUP BY DATE(paid_at) ORDER BY sale_date DESC");
+        $dailyMap = [];
+        foreach ($dailyStmt as $row) $dailyMap[$row['sale_date']] = $row;
+        $dailyRows = '';
+        $todayRevenue = 0;
+        $todayOrders = 0;
+        $todayItems = 0;
+        $today = new DateTimeImmutable('today');
+        for ($i = 0; $i < 7; $i++) {
+            $date = $today->modify('-' . $i . ' days');
+            $key = $date->format('Y-m-d');
+            $row = $dailyMap[$key] ?? ['order_count' => 0, 'revenue' => 0, 'items_amount' => 0];
+            if ($i === 0) {
+                $todayRevenue = (int)$row['revenue'];
+                $todayOrders = (int)$row['order_count'];
+                $todayItems = (int)$row['items_amount'];
+            }
+            $dailyRows .= '<tr><td><strong>' . ($i === 0 ? '오늘' : e($date->format('m월 d일'))) . '</strong><span class="table-sub">' . e($date->format('Y.m.d')) . '</span></td><td class="right num">' . num($row['order_count']) . '건</td><td class="right num amount">' . won($row['revenue']) . '</td></tr>';
+        }
+        $productStmt = db()->query("SELECT oi.product_name, SUM(oi.qty) AS quantity, SUM(oi.line_amount) AS amount FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.paid_at IS NOT NULL AND o.status IN ($paidStatuses) GROUP BY oi.product_id,oi.product_name ORDER BY quantity DESC,amount DESC LIMIT 10");
+        $productRows = '';
+        foreach ($productStmt as $row) $productRows .= '<tr><td><strong>' . e($row['product_name']) . '</strong></td><td class="right num">' . num($row['quantity']) . '개</td><td class="right num amount">' . won($row['amount']) . '</td></tr>';
+        if ($productRows === '') $productRows = '<tr><td colspan="3" class="empty-cell">아직 판매 완료된 상품이 없습니다.</td></tr>';
+        $dashboard = '<div class="page-head"><div><h1>대시보드</h1><p class="page-sub">입금 확인 완료된 주문 기준 · 최근 7일</p></div><span class="chip ' . ($s['live_on'] ? 'paid' : '') . '">' . ($s['live_on'] ? 'LIVE 방송 중' : '방송 OFF') . '</span></div><div class="stats"><div class="stat alert"><span class="k">오늘 매출</span><b class="num">' . won($todayRevenue) . '</b><span class="s">결제 완료 기준</span></div><div class="stat"><span class="k">오늘 판매량</span><b class="num">' . num($todayItems) . '개</b><span class="s">상품 수량 합계</span></div><div class="stat"><span class="k">오늘 주문</span><b class="num">' . num($todayOrders) . '건</b><span class="s">결제 완료 기준</span></div><div class="stat"><span class="k">입금 대기</span><b class="num">' . num($counts['orders']) . '건</b><span class="s">확인 필요</span></div></div><div class="dashboard-analytics"><section class="card analytics-card"><div class="card-heading"><div><h2>일별 매출</h2><p>최근 7일의 주문 수와 매출을 확인해요.</p></div><span class="analytics-icon">₩</span></div><div class="table-wrap"><table class="analytics-table"><thead><tr><th>날짜</th><th class="right">주문</th><th class="right">매출</th></tr></thead><tbody>' . $dailyRows . '</tbody></table></div></section><section class="card analytics-card"><div class="card-heading"><div><h2>판매 상품</h2><p>결제 완료된 상품을 많이 팔린 순서로 보여줘요.</p></div><span class="analytics-icon">TOP</span></div><div class="table-wrap"><table class="analytics-table"><thead><tr><th>상품</th><th class="right">수량</th><th class="right">판매액</th></tr></thead><tbody>' . $productRows . '</tbody></table></div></section></div><section class="card live-card"><div><h2>방송 상태</h2><p>' . ($s['live_on'] ? '현재 고객이 상품을 주문할 수 있어요.' : '방송을 시작하면 고객이 상품을 주문할 수 있어요.') . '</p></div><form method="post" action="/admin/live"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="on" value="' . ($s['live_on'] ? '0' : '1') . '"><button class="btn pink">' . ($s['live_on'] ? '방송 종료' : '방송 시작') . '</button></form></section><p class="dashboard-footnote">등록 상품 ' . num($counts['products']) . '개 · 회원 ' . num($counts['users']) . '명</p>';
+        admin_shell('대시보드', $dashboard);
     }
 
     if ($path === '/admin/live' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -921,13 +946,21 @@ function admin_order(int $id): never
     $items = db()->prepare('SELECT * FROM order_items WHERE order_id=?');
     $items->execute([$id]);
     $list = '';
-        foreach ($items as $item) $list .= '<li>' . e($item['product_name']) . ($item['package_type'] === 'full' ? ' · 풀박' : ($item['package_type'] === 'loose' ? ' · 낱박' : '')) . ' × ' . (int)$item['qty'] . ' · ' . won($item['line_amount']) . '</li>';
+    $itemCount = 0;
+    foreach ($items as $item) {
+        $itemCount++;
+        $packageLabel = $item['package_type'] === 'full' ? '풀박' : ($item['package_type'] === 'loose' ? '낱박' : '기본 구성');
+        $split = ((int)$item['qty_opened'] || (int)$item['qty_unopened']) ? ' · 라이브 개봉 ' . (int)$item['qty_opened'] . '개 · 미개봉 발송 ' . (int)$item['qty_unopened'] . '개' : '';
+        $list .= '<div class="order-item"><div><strong>' . e($item['product_name']) . '</strong><span>' . e($packageLabel) . $split . ' · 수량 ' . num($item['qty']) . '</span></div><b class="num">' . won($item['line_amount']) . '</b></div>';
+    }
     $deliveryInfo = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
-    if (!empty($order['keep_merge_requested'])) $deliveryInfo .= ' · 기존 킵 ' . won($order['keep_merge_amount']) . ' 같이 배송';
+    $deliveryClass = $order['delivery_type'] === 'keep' ? 'keep' : 'direct';
+    $mergeNotice = !empty($order['keep_merge_requested']) ? '기존 킵 ' . won($order['keep_merge_amount']) . ' 같이 배송' : '';
     $actionButtons = $order['status'] === 'pending' ? '<button class="btn pink" name="action" value="confirm">입금 확인·포인트 적립</button> <button class="btn danger" name="action" value="cancel">주문 취소</button>' : '';
     if (in_array($order['status'], ['paid', 'preparing'], true)) $actionButtons .= ' <button class="btn pink" name="action" value="ship">발송 완료 처리</button>';
     if ($actionButtons === '') $actionButtons = '<span class="hint">추가로 처리할 작업이 없습니다.</span>';
-    $html = '<div class="page-head"><h1>주문 ' . e($order['order_no']) . '</h1></div><div class="card"><p>회원: ' . e($order['login_id']) . '</p><p>상태: ' . e(order_status_label($order)) . '</p><p>배송 방식: ' . e($deliveryInfo) . '</p><p>받는 분: ' . e($order['recipient_name']) . ' / ' . e($order['recipient_phone']) . '</p><p>주소: ' . e($order['address1']) . ' ' . e($order['address2']) . '</p><p>현금영수증: ' . e((string)$order['cash_receipt_type']) . ' / ' . e((string)$order['cash_receipt_value']) . '</p><ul>' . $list . '</ul><div class="sum-row total">' . won($order['total_amount']) . '</div><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '">' . $actionButtons . '</form></div>';
+    $receiptLabel = $order['cash_receipt_type'] === 'income' ? '소득공제용' : ($order['cash_receipt_type'] === 'expense' ? '지출증빙용' : '신청 안 함');
+    $html = '<div class="page-head"><div><h1>주문 ' . e($order['order_no']) . '</h1><p class="page-sub">주문 상세 정보를 확인하고 처리하세요.</p></div><a class="btn ghost" href="/admin/orders">주문 목록</a></div><div class="order-layout"><div class="order-main"><section class="card order-card"><div class="order-card-heading"><h2>주문 상품</h2><span class="muted">' . num($itemCount) . '개 상품</span></div><div class="order-items-list">' . ($list ?: '<p class="empty">상품 정보가 없습니다.</p>') . '</div><div class="order-price-list"><div><span>상품금액</span><b class="num">' . won($order['items_amount']) . '</b></div><div><span>배송비</span><b class="num">' . ((int)$order['shipping_fee'] ? won($order['shipping_fee']) : '무료') . '</b></div>' . ((int)$order['point_used'] ? '<div><span>포인트 사용</span><b class="num discount">-' . num($order['point_used']) . 'P</b></div>' : '') . '<div class="total"><span>결제금액</span><strong class="num">' . won($order['total_amount']) . '</strong></div></div></section><section class="card order-card"><div class="order-card-heading"><h2>주문 메모</h2></div><p class="order-memo">' . ($order['memo'] ? nl2br(e($order['memo'])) : '남겨진 배송 메모가 없습니다.') . '</p></section></div><aside class="order-side"><section class="card order-card"><div class="order-status-line"><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span><span class="chip ' . $deliveryClass . '">' . e($deliveryInfo) . '</span></div>' . ($mergeNotice ? '<p class="order-merge">' . e($mergeNotice) . '</p>' : '') . '<dl class="order-meta"><div><dt>회원</dt><dd>' . e($order['login_id']) . '</dd></div><div><dt>받는 분</dt><dd>' . e($order['recipient_name']) . '<br>' . e($order['recipient_phone']) . '</dd></div><div><dt>주소</dt><dd>' . e(trim($order['address1'] . ' ' . $order['address2'])) . '</dd></div><div><dt>현금영수증</dt><dd>' . e($receiptLabel) . ($order['cash_receipt_value'] ? '<br>' . e($order['cash_receipt_value']) : '') . '</dd></div></dl></section><section class="card order-card order-action-card"><h2>주문 처리</h2><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><div class="order-actions">' . $actionButtons . '</div></form></section></aside></div>';
     admin_shell('주문 상세', $html);
 }
 
