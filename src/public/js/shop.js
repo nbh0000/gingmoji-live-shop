@@ -359,6 +359,8 @@
       // 최신 가격 반영
       var byId = {};
       q.lines.forEach(function (l) { byId[l.productId + ':' + (l.packageType || 'standard')] = l; });
+      // 삭제·비공개 처리된 상품은 서버 견적에 포함되지 않으므로 브라우저 장바구니에서도 제거한다.
+      cart = cart.filter(function (l) { return !!byId[l.productId + ':' + (l.packageType || 'standard')]; });
       cart.forEach(function (l) {
         var x = byId[l.productId + ':' + (l.packageType || 'standard')];
         if (x) { l.price = x.unitPrice; if (x.name) l.name = x.name; if (x.imageId) l.imageId = x.imageId; }

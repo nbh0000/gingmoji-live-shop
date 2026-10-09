@@ -92,7 +92,16 @@
     var cart = S.load();
     if (!cart.length) { quote = { lines: [] }; renderLines(quote); renderSummary(null); return; }
     S.api('POST', '/api/cart/quote', { lines: S.toLines(cart), deliveryType: delivery(), includeKept: includeKept(), pointUse: pointUse() })
-      .then(function (q) { quote = q; GM.live = q.live; renderLines(q); renderSummary(q); })
+      .then(function (q) {
+        var byId = {};
+        q.lines.forEach(function (l) { byId[l.productId + ':' + (l.packageType || 'standard')] = l; });
+        cart = cart.filter(function (l) { return !!byId[l.productId + ':' + (l.packageType || 'standard')]; });
+        S.save(cart);
+        quote = q;
+        GM.live = q.live;
+        renderLines(q);
+        renderSummary(q);
+      })
       .catch(function (e) { S.toast(e.message, 'error'); });
   }
 
