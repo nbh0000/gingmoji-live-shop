@@ -91,6 +91,36 @@ button, a { touch-action: manipulation; }
 .live-card p { color: var(--muted); margin: 0; }
 .dashboard-footnote { color: var(--muted); font-size: 12px; margin: 12px 2px 0; }
 @media (max-width: 900px) { .dashboard-analytics { grid-template-columns: 1fr; } }
+.history-filters { display: grid; gap: 16px; margin-bottom: 14px; }
+.filter-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.filter-title h2 { margin: 0 0 4px; }
+.filter-title p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; align-items: end; }
+.filter-grid .field { min-width: 0; }
+.filter-submit { display: flex; gap: 7px; align-items: end; flex-wrap: wrap; }
+.filter-submit .btn { flex: 1 1 auto; }
+.order-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.orders-table .order-no { font-weight: 800; color: var(--pink-dd); }
+.table-sub { display: block; color: var(--muted); font-size: 11.5px; margin-top: 3px; line-height: 1.4; }
+.package-media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.package-media-grid > div { min-width: 0; padding: 14px; border-radius: 14px; background: #fdf9f7; border: 1px solid var(--line); }
+.action-help { margin: -6px 0 14px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.action-select { display: grid; gap: 5px; flex: 1 1 180px; }
+.action-select span { color: var(--muted); font-size: 11px; font-weight: 700; }
+.action-select select { min-height: 38px; padding: 0 10px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
+.order-history { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.history-item { position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; padding: 0 0 18px; }
+.history-item:not(:last-child)::before { content: ''; position: absolute; left: 8px; top: 17px; bottom: 0; width: 1px; background: var(--line); }
+.history-dot { position: relative; z-index: 1; width: 16px; height: 16px; margin-top: 2px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 0 4px var(--pink-ll); }
+.history-body { min-width: 0; padding-bottom: 4px; }
+.history-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.history-top strong { font-size: 14px; }
+.history-top time { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.history-body p { margin: 4px 0 5px; color: var(--muted); font-size: 12.5px; }
+.history-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; }
+.history-transition { color: var(--pink-dd); font-weight: 700; }
+.history-refund { color: var(--err); font-weight: 700; }
+@media (max-width: 700px) { .filter-grid, .order-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filter-submit { grid-column: 1 / -1; } .package-media-grid { grid-template-columns: 1fr; } }
 
 /* 방송 토글 */
 .live-switch { display: flex; align-items: center; gap: 14px; background: var(--night); color: var(--cream); border-radius: 26px; padding: 16px 18px; }

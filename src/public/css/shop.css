@@ -226,7 +226,9 @@ body.has-cartbar main.wrap { max-width: 820px; }
   transition: transform 260ms var(--ease);
 }
 .cartbar.show { transform: none; }
-.cartbar .btn { max-width: 528px; margin: 0 auto; display: flex; width: 100%; justify-content: space-between; padding: 0 10px 0 22px; }
+.cartbar-inner { max-width: 528px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.cartbar .btn { display: flex; width: 100%; justify-content: space-between; padding: 0 10px 0 22px; }
+.cartbar .cartbar-buy { width: auto; padding-inline: 18px; justify-content: center; }
 .cartbar .count { background: var(--pink); color: var(--night); border-radius: var(--r-pill); padding: 4px 12px; font-family: var(--f-body); font-size: 14px; font-weight: 800; }
 .has-cartbar { padding-bottom: calc(var(--bar-h) + 24px); }
 
@@ -289,6 +291,10 @@ body.has-cartbar main.wrap { max-width: 820px; }
 .detail-package-option { position: relative; cursor: pointer; }
 .detail-package-option input { position: absolute; opacity: 0; pointer-events: none; }
 .detail-package-option > span { display: grid; gap: 3px; min-height: 104px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: var(--shadow); }
+.package-option-content { display: grid !important; grid-template-columns: 58px minmax(0, 1fr); gap: 10px !important; align-items: center; }
+.package-option-image { width: 58px; height: 58px; overflow: hidden; border-radius: 10px; background: var(--pink-ll); display: grid; place-items: center; color: var(--pink-dd); font-size: 11px; font-weight: 800; }
+.package-option-image img { width: 100%; height: 100%; object-fit: cover; }
+.package-option-content > span:last-child { display: grid; gap: 3px; min-width: 0; }
 .detail-package-option strong { font-size: 16px; }
 .detail-package-option small { color: var(--muted); font-size: 12px; line-height: 1.45; }
 .detail-package-option b { margin-top: auto; color: var(--pink-dd); font-size: 16px; }
@@ -297,6 +303,8 @@ body.has-cartbar main.wrap { max-width: 820px; }
 .detail-option-box { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 18px; display: grid; gap: 14px; }
 .detail-option-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; }
 .detail-option-label span { color: var(--muted); font-size: 12px; }
+.expected-shipping { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; background: #e9f7f0; color: #2d7258; font-size: 13px; }
+.expected-shipping strong { margin-left: 6px; }
 .detail-option-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: var(--shadow); }
 .detail-option-row > div:first-child { display: grid; gap: 2px; }
 .detail-option-row strong { font-size: 15px; }
@@ -370,6 +378,7 @@ body.has-cartbar main.wrap { max-width: 820px; }
 .cart-line .rm { border: 0; background: none; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px; }
 .cart-line .split { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .cart-line .split .s { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 6px 5px 14px; border-radius: 14px; background: var(--pink-ll); font-size: 14px; font-weight: 700; }
+.cartbar .disabled { opacity: .48; pointer-events: auto; }
 .hint { background: #f7f1ef; border-radius: var(--r-md); padding: 12px 14px; color: var(--muted); font-size: 13.5px; }
 .sum-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; }
 .sum-row.total { font-size: 18px; font-weight: 800; padding-top: 10px; }
@@ -499,7 +508,7 @@ body.has-cartbar main.wrap { max-width: 820px; }
 .keep-meter { display: grid; gap: 8px; }
 .keep-amount { font-family: var(--f-display); font-size: 30px; color: var(--pink-dd); line-height: 1.1; }
 .meter { height: 16px; border-radius: 99px; background: #f3e4e0; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06); }
-.meter i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--pink), var(--pink-d)); box-shadow: var(--puffy); transition: width 500ms var(--ease); }
+.meter i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--pink), var(--pink-d)); box-shadow: var(--puffy); }
 .keep-left { font-weight: 700; font-size: 14.5px; }
 .keep-left b { color: var(--pink-dd); }
 

@@ -89,6 +89,7 @@
   var openSheetEl = null;
   function openSheet(el) {
     if (openSheetEl && openSheetEl !== el) closeSheet();
+    el.removeAttribute('hidden');
     el.hidden = false;
     openSheetEl = el;
     requestAnimationFrame(function () {
@@ -104,7 +105,7 @@
     el.classList.remove('open');
     if (backdrop) backdrop.classList.remove('open');
     document.documentElement.style.overflow = '';
-    setTimeout(function () { if (!el.classList.contains('open')) el.hidden = true; }, 320);
+    setTimeout(function () { if (!el.classList.contains('open')) { el.hidden = true; el.setAttribute('hidden', ''); } }, 320);
   }
   if (backdrop) backdrop.addEventListener('click', closeSheet);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
@@ -168,22 +169,40 @@
       GM.live = j.live;
       var inCart = load().filter(function (l) { return l.productId === p.id; })[0];
       var already = inCart ? lineQty(inCart) : 0;
-      psState = { p: p, opened: 0, unopened: 0, qty: p.useOpenOption ? 0 : 1, already: already };
+      psState = { p: p, packageType: 'full', opened: 0, unopened: 0, qty: p.useOpenOption ? 0 : 1, already: already };
       var body = $('[data-ps-body]', ps);
+      var packagePrice = function () {
+        if (!p.usePackageOption) return p.price;
+        return psState.packageType === 'full' ? (p.fullBoxPrice || p.price) : (p.loosePrice || p.price);
+      };
       var imgs = p.images.length
         ? p.images.map(function (i) { return '<div class="thumb"><img src="/img/' + i + '" alt=""></div>'; }).join('')
         : '<div class="thumb"><span class="ph">?</span></div>';
+      var packageHtml = p.usePackageOption
+        ? '<div class="detail-package-box"><div class="detail-option-label"><strong>상품 구성을 골라 주세요</strong><span>풀박 또는 낱박</span></div><div class="detail-package-options"><label class="detail-package-option"><input type="radio" name="sheetPackage" value="full" checked><span class="package-option-content"><span class="package-option-image">' + (p.fullBoxImageId ? '<img src="/img/' + p.fullBoxImageId + '" alt="풀박">' : '풀박') + '</span><span><strong>풀박</strong><small>풀박스 구성</small><b>' + won(p.fullBoxPrice || p.price) + '</b></span></span></label><label class="detail-package-option"><input type="radio" name="sheetPackage" value="loose"><span class="package-option-content"><span class="package-option-image">' + (p.looseImageId ? '<img src="/img/' + p.looseImageId + '" alt="낱박">' : '낱박') + '</span><span><strong>낱박</strong><small>패키지 내 개별 상품</small><b>' + won(p.loosePrice || p.price) + '</b></span></span></label></div></div>'
+        : '';
       body.innerHTML =
         '<div class="p-gallery">' + imgs + '</div>' +
         '<div class="p-name" id="ps-name">' + esc(p.name) + '</div>' +
-        (p.price != null ? '<div class="p-price">' + won(p.price) + '</div>' : '<div class="price hidden">가격은 방송 중에 공개돼요</div>') +
+        (p.price != null ? '<div class="p-price" data-sheet-price>' + won(packagePrice()) + '</div>' : '<div class="price hidden">가격은 방송 중에 공개돼요</div>') +
         '<div class="p-meta">' +
           (p.soldout ? '<span class="chip gray">품절</span>' : (p.showStock ? '<span class="chip">재고 ' + p.stock + '개</span>' : '')) +
           (already ? '<span class="chip gray">장바구니에 ' + already + '개</span>' : '') +
         '</div>' +
+        packageHtml +
+        (p.expectedShippingText ? '<p class="expected-shipping">예상 배송일 <strong>' + esc(p.expectedShippingText) + '</strong></p>' : '') +
         (p.description ? '<div class="p-desc">' + esc(p.description) + '</div>' : '') +
         '<div class="opt-box" data-ps-opts></div>';
       var opts = $('[data-ps-opts]', body);
+      $$('input[name="sheetPackage"]', body).forEach(function (radio) {
+        radio.addEventListener('change', function () {
+          if (!this.checked) return;
+          psState.packageType = this.value;
+          var priceEl = $('[data-sheet-price]', body);
+          if (priceEl) priceEl.textContent = won(packagePrice());
+          syncAdd();
+        });
+      });
       var left = function () { return Math.max(0, p.stock - already); };
       var total = function () { return p.useOpenOption ? psState.opened + psState.unopened : psState.qty; };
       if (!p.soldout && j.live) {
@@ -222,7 +241,8 @@
     if (p.soldout) { btn.textContent = '품절된 상품이에요'; btn.disabled = true; return; }
     if (psState.already >= p.stock) { btn.textContent = '더 담을 수 없는 상품이에요'; btn.disabled = true; return; }
     if (n < 1) { btn.textContent = p.useOpenOption ? '개봉 방법과 수량을 골라 주세요' : '수량을 골라 주세요'; btn.disabled = true; return; }
-    btn.innerHTML = n + '개 담기' + (p.price != null ? ' <span class="sub">' + won(p.price * n) + '</span>' : '');
+    var unitPrice = p.usePackageOption ? (psState.packageType === 'full' ? (p.fullBoxPrice || p.price) : (p.loosePrice || p.price)) : p.price;
+    btn.innerHTML = n + '개 담기' + (unitPrice != null ? ' <span class="sub">' + won(unitPrice * n) + '</span>' : '');
   }
 
   if (ps) {
@@ -230,11 +250,14 @@
       if (!psState) return;
       var p = psState.p;
       var cart = load();
-      var line = cart.filter(function (l) { return l.productId === p.id; })[0];
-      if (!line) {
-        line = { productId: p.id, name: p.name, price: p.price, imageId: p.images[0] || null, option: p.useOpenOption, opened: 0, unopened: 0, qty: 0 };
-        cart.push(line);
-      }
+       var packageType = p.usePackageOption ? psState.packageType : 'standard';
+       var unitPrice = p.usePackageOption ? (packageType === 'full' ? (p.fullBoxPrice || p.price) : (p.loosePrice || p.price)) : p.price;
+       var line = cart.filter(function (l) { return l.productId === p.id && (l.packageType || 'standard') === packageType; })[0];
+       if (!line) {
+         line = { productId: p.id, name: p.name, price: unitPrice, packageType: packageType, imageId: p.images[0] || null, option: p.useOpenOption, opened: 0, unopened: 0, qty: 0 };
+         cart.push(line);
+       }
+       line.price = unitPrice;
       line.name = p.name;
       line.price = p.price;
       if (p.useOpenOption) {
@@ -315,12 +338,18 @@
     });
     $('[data-cart-total]', cs).textContent = GM.showPrice ? won(cartTotal(cart)) : '방송 중 공개';
     var hint = $('[data-cart-hint]', cs);
-    hint.textContent = won(GM.freeShip) + ' 이상 바로배송 무료 · 킵은 배송비를 지금 결제하지 않아요';
+    if (hint) hint.textContent = won(GM.freeShip) + ' 이상 바로배송 무료 · 킵은 배송비를 지금 결제하지 않아요';
     var go = $('[data-go-checkout]', cs);
     var bad = quote && quote.hasProblem;
     go.classList.toggle('disabled', !GM.live || bad);
-    go.textContent = !GM.live ? '방송 중에만 주문할 수 있어요' : bad ? '품절·재고 부족 상품을 정리해 주세요' : '결제하러 가기';
+    go.textContent = !GM.live ? '방송 중에만 주문할 수 있어요' : bad ? '품절·재고 부족 상품을 정리해 주세요' : '장바구니 상품 바로 구매';
     go.href = GM.loggedIn ? '/checkout' : '/login?next=/checkout';
+    var direct = $('[data-cart-direct]');
+    if (direct) {
+      direct.href = GM.loggedIn ? '/checkout' : '/login?next=/checkout';
+      direct.classList.toggle('disabled', !GM.live || bad);
+      direct.setAttribute('aria-disabled', (!GM.live || bad) ? 'true' : 'false');
+    }
   }
 
   function refreshQuote() {
@@ -347,6 +376,13 @@
       openSheet(cs);
       refreshQuote().then(function (q) { renderCart(q); });
     });
+  });
+
+  document.addEventListener('click', function (e) {
+    var direct = e.target.closest('[data-cart-direct]');
+    if (!direct || !direct.classList.contains('disabled')) return;
+    e.preventDefault();
+    toast(!GM.live ? '방송 중에만 바로 구매할 수 있어요' : '품절·재고 부족 상품을 먼저 정리해 주세요', 'error');
   });
 
   // ===== 방송 상태 / 재고 폴링 (5초) =====

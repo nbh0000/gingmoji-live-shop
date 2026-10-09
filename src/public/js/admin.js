@@ -23,7 +23,8 @@
     var box = $('[data-upload-preview="' + role + '"]');
     if (!box) return;
     var incoming = Array.prototype.slice.call(input.files || []);
-    var files = role === 'main' ? incoming.slice(0, 1) : (input._selectedFiles || []).concat(incoming);
+    var single = role === 'main' || role === 'full-box' || role === 'loose';
+    var files = single ? incoming.slice(0, 1) : (input._selectedFiles || []).concat(incoming);
     var seen = {};
     files = files.filter(function (file) {
       var key = fileKey(file);
@@ -34,12 +35,12 @@
     input._selectedFiles = files;
     syncFileInput(input, files);
 
-    if (role === 'main') {
+    if (single) {
       box.innerHTML = '';
     } else {
       $$('[data-new-upload]', box).forEach(function (figure) { figure.remove(); });
     }
-    if (!files.length && role === 'main') {
+    if (!files.length && single) {
       box.innerHTML = '<p class="upload-empty">선택된 이미지가 없습니다.</p>';
       return;
     }
@@ -52,7 +53,7 @@
       image.src = URL.createObjectURL(file);
       image.onload = function () { URL.revokeObjectURL(image.src); };
       var caption = document.createElement('figcaption');
-      caption.textContent = role === 'main' ? '새 메인 이미지' : file.name;
+      caption.textContent = role === 'main' ? '새 메인 이미지' : (role === 'full-box' ? '새 풀박 이미지' : (role === 'loose' ? '새 낱박 이미지' : file.name));
       figure.appendChild(image);
       figure.appendChild(caption);
       box.appendChild(figure);
@@ -197,8 +198,11 @@
           out.forEach(function (f) {
             var d = document.createElement('div');
             d.className = 'img';
-            d.innerHTML = '<img alt=""><div class="muted" style="font-size:11px">' + Math.round(f.size / 1024) + 'KB · 저장 시 업로드</div>';
-            $('img', d).src = URL.createObjectURL(f);
+            var image = document.createElement('img');
+            image.alt = f.name;
+            image.src = URL.createObjectURL(f);
+            d.appendChild(image);
+            d.insertAdjacentHTML('beforeend', '<div class="muted" style="font-size:11px">' + Math.round(f.size / 1024) + 'KB · 저장 시 업로드</div>');
             preview.appendChild(d);
           });
         }

@@ -259,8 +259,29 @@ function post_value(string $key, mixed $default = ''): mixed
 
 function order_status_label(array $o): string
 {
-    if (($o['status'] ?? '') === 'pending') return ($o['payment_method'] ?? '') === 'card' ? '결제대기' : '입금대기';
-    return ['paid' => '결제완료', 'kept' => '킵보관', 'preparing' => '배송준비', 'shipped' => '발송완료', 'cancelled' => '취소'][$o['status'] ?? ''] ?? (string)($o['status'] ?? '');
+    if (($o['status'] ?? '') === 'pending') return ($o['payment_method'] ?? '') === 'card' ? '카드 결제대기' : '입금대기';
+    return ['paid' => '결제완료 · 발송대기', 'kept' => '결제완료 · 킵보관', 'preparing' => '배송준비중', 'shipped' => '배송완료 · 판매완료', 'cancelled' => '취소·반품'][$o['status'] ?? ''] ?? (string)($o['status'] ?? '');
+}
+
+function order_event_label(array $event): string
+{
+    return [
+        'created' => '주문 생성',
+        'imported' => '기존 주문 기록 생성',
+        'payment_confirmed' => '입금 확인 · 결제 완료',
+        'keep_merge' => '킵 합배송 연결',
+        'shipped' => '판매 완료 · 발송 완료',
+        'cancelled' => '주문 취소 · 환불',
+        'return_completed' => '반품 · 환불 처리',
+        'status_changed' => '주문 상태 변경',
+    ][(string)($event['event_type'] ?? '')] ?? (string)($event['event_type'] ?? '주문 처리');
+}
+
+function log_order_event(PDO $pdo, int $orderId, string $eventType, ?string $fromStatus, ?string $toStatus, string $memo = '', int $refundAmount = 0, string $actorType = 'system', ?int $actorId = null): void
+{
+    $pdo->prepare('INSERT INTO order_events (order_id,actor_type,actor_id,event_type,from_status,to_status,memo,refund_amount) VALUES (?,?,?,?,?,?,?,?)')->execute([
+        $orderId, $actorType, $actorId, $eventType, $fromStatus, $toStatus, $memo, $refundAmount,
+    ]);
 }
 
 function point_policy(array $s): array
