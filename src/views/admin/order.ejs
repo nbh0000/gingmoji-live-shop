@@ -29,6 +29,9 @@
         <% if (o.status !== 'cancelled' && o.status !== 'shipped') { %>
           <form method="post" action="/admin/orders/<%= o.id %>/cancel" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn danger" data-confirm="이 주문을 취소할까요? 재고가 되돌아가고<%= o.payment_method === 'card' && o.status !== 'pending' ? ' 카드 결제가 취소되며' : '' %> 포인트가 정리됩니다">주문 취소</button></form>
         <% } %>
+        <% if (o.status === 'cancelled') { %>
+          <form method="post" action="/admin/orders/<%= o.id %>/delete" class="inline"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn danger" data-confirm-dialog="<%= o.order_no %> 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 삭제</button></form>
+        <% } %>
       </div>
     </section>
 

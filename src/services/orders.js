@@ -456,6 +456,26 @@ async function cancelOrder(orderId, { by = 'admin', reason = 'admin', userId = n
   });
 }
 
+// 완전 삭제는 취소된 주문에만 허용한다. 포인트 원장은 보존하고 주문 연결만 해제한다.
+async function deleteOrder(orderId) {
+  return db.tx(async (conn) => {
+    const [[o]] = await conn.query('SELECT id, order_no, status, shipment_request_id FROM orders WHERE id = ? FOR UPDATE', [orderId]);
+    if (!o) throw new PolicyError('주문을 찾을 수 없습니다', 'NOT_FOUND');
+    if (o.status !== 'cancelled') {
+      throw new PolicyError('취소된 주문만 삭제할 수 있습니다. 먼저 주문을 취소해 주세요', 'DELETE_ONLY_CANCELLED');
+    }
+    if (o.shipment_request_id) {
+      throw new PolicyError('출고 이력이 연결된 주문은 삭제할 수 없습니다', 'HAS_SHIPMENT');
+    }
+
+    await conn.query('UPDATE point_ledger SET order_id = NULL WHERE order_id = ?', [o.id]);
+    await conn.query("DELETE FROM payments WHERE target_type = 'order' AND target_id = ?", [o.id]);
+    const [result] = await conn.query("DELETE FROM orders WHERE id = ? AND status = 'cancelled'", [o.id]);
+    if (result.affectedRows !== 1) throw new PolicyError('주문 삭제에 실패했습니다. 다시 시도해 주세요', 'DELETE_FAILED');
+    return o;
+  });
+}
+
 // ===== 상태 변경 (관리자) =====
 
 // 관리자가 직접 바꿀 수 있는 전이. 입금 확인/취소/킵 출고는 별도 함수.
@@ -541,6 +561,7 @@ module.exports = {
   applyCardPayment,
   completeCardPayment,
   cancelOrder,
+  deleteOrder,
   setStatus,
   setTracking,
   expireStale,

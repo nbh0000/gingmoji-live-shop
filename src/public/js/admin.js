@@ -91,6 +91,13 @@
       .then(function (r) { return r.json(); });
   }
 
+  // 되돌릴 수 없는 삭제는 브라우저 확인창으로 한 번 더 확인
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-confirm-dialog]');
+    if (!btn) return;
+    if (!window.confirm(btn.getAttribute('data-confirm-dialog'))) e.preventDefault();
+  }, true);
+
   // 위험한 버튼은 두 번 눌러야 실행 (브라우저 확인창 대신 버튼 문구로 확인)
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-confirm]');

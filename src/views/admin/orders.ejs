@@ -35,7 +35,7 @@
     <table>
       <thead><tr>
         <th class="check"><input type="checkbox" data-check-all aria-label="전체 선택"></th>
-        <th>유튜브 닉네임 / 받는 분</th><th>상품 (<%= fmt.OPT.short.opened %>/<%= fmt.OPT.short.unopened %>)</th><th class="right">결제금액</th><th>결제·배송</th><th>상태</th><th>주문시각</th><th>처리</th>
+        <th>회원 · 유튜브 · 입금자 / 받는 분</th><th>상품 (<%= fmt.OPT.short.opened %>/<%= fmt.OPT.short.unopened %>)</th><th class="right">결제금액</th><th>결제·배송</th><th>상태</th><th>주문시각</th><th>처리</th>
       </tr></thead>
       <tbody>
       <% if (!list.length) { %><tr><td colspan="8" class="empty">조건에 맞는 주문이 없어요</td></tr><% } %>
@@ -43,8 +43,10 @@
         <tr class="row">
           <td class="check"><input type="checkbox" name="ids" value="<%= o.id %>" data-check aria-label="선택"></td>
           <td>
-            <a class="nick" href="/admin/orders/<%= o.id %>"><%= o.youtube_nickname || o.user_nick || '-' %></a>
-            <span class="nick-sub"><%= o.recipient_name %> · <%= fmt.phone(o.recipient_phone) %></span>
+            <a class="nick" href="/admin/orders/<%= o.id %>"><%= o.user_name || o.user_nick || '-' %></a>
+            <span class="nick-sub">유튜브 · <%= o.youtube_nickname || o.user_nick || '-' %></span>
+            <span class="nick-sub">입금자 · <%= o.depositor_name || '-' %></span>
+            <span class="nick-sub">받는 분 · <%= o.recipient_name %> · <%= fmt.phone(o.recipient_phone) %></span>
             <% if (o.payment_method === 'bank' && o.depositor_name && o.depositor_name !== o.recipient_name) { %><div class="nick-sub">입금자 <b><%= o.depositor_name %></b></div><% } %>
           </td>
           <td class="items">
@@ -57,10 +59,13 @@
           <td>
             <div class="actions">
               <% if (o.status === 'pending' && o.payment_method === 'bank') { %>
-                <button class="btn sm ok" type="submit" formaction="/admin/orders/<%= o.id %>/confirm" data-confirm="<%= o.youtube_nickname %>님 <%= fmt.won(o.total_amount) %> 입금 확인할까요?">입금 확인</button>
+                <button class="btn sm ok" type="submit" formaction="/admin/orders/<%= o.id %>/confirm">입금 완료</button>
               <% } %>
               <% if (o.status === 'paid') { %><button class="btn sm soft" type="submit" formaction="/admin/orders/<%= o.id %>/status" name="status" value="preparing">배송준비</button><% } %>
               <% if (o.status === 'paid' || o.status === 'preparing') { if (!o.shipment_request_id) { %><a class="btn sm ghost" href="/admin/orders/<%= o.id %>#tracking">송장</a><% } } %>
+              <% if (o.status === 'cancelled') { %>
+                <button class="btn sm danger" type="submit" formaction="/admin/orders/<%= o.id %>/delete" data-confirm-dialog="<%= o.order_no %> 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 삭제</button>
+              <% } %>
             </div>
           </td>
         </tr>

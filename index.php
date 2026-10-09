@@ -35,7 +35,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php6' : '/static/css/shop.css?v=php11';
+    $css = $admin ? '/static/css/admin.css?v=php7' : '/static/css/shop.css?v=php11';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -49,9 +49,9 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     if ($admin) {
         echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . e($title) . ' · 깅모지 관리자</title><link rel="stylesheet" href="' . $css . '"></head><body><div class="shell"><aside class="side"><a class="logo" href="/admin">깅모지<small>ADMIN</small></a><nav class="nav"><a href="/admin">대시보드</a><a href="/admin/orders">주문 관리</a><a href="/admin/products">상품·재고</a><a href="/admin/settings">사이트 설정</a><a href="/admin/pages">약관·정책</a></nav><div class="side-foot"><a href="/" target="_blank">고객 화면 열기 ↗</a><form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><button class="btn sm ghost">로그아웃</button></form></div></aside><main class="main">';
         if ($flash) {
-            echo '<div class="flash ' . ($flash[0] === 'error' ? 'error' : '') . '">' . e($flash[1]) . '</div>';
+            echo '<div class="flash ' . ($flash[0] === 'error' ? 'error' : '') . '" role="status" aria-live="polite">' . e($flash[1]) . '</div>';
         }
-        echo $body . '</main></div><script src="/static/js/admin.js?v=php6"></script></body></html>';
+        echo $body . '</main></div><script src="/static/js/admin.js?v=php7"></script></body></html>';
         exit;
     }
 
@@ -908,8 +908,8 @@ function handle_admin(string $path): never
             $params[] = $status;
         }
         if ($search !== '') {
-            $where[] = '(o.order_no LIKE ? OR u.login_id LIKE ? OR o.recipient_name LIKE ? OR o.youtube_nickname LIKE ?)';
-            for ($i = 0; $i < 4; $i++) $params[] = '%' . $search . '%';
+            $where[] = '(o.order_no LIKE ? OR u.login_id LIKE ? OR u.name LIKE ? OR o.recipient_name LIKE ? OR o.youtube_nickname LIKE ? OR u.youtube_nickname LIKE ? OR o.depositor_name LIKE ?)';
+            for ($i = 0; $i < 7; $i++) $params[] = '%' . $search . '%';
         }
         if ($productId > 0) {
             $where[] = 'EXISTS (SELECT 1 FROM order_items filter_items WHERE filter_items.order_id=o.id AND filter_items.product_id=?)';
@@ -924,7 +924,7 @@ function handle_admin(string $path): never
             $params[] = $to . ' 00:00:00';
         }
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
-        $stmt = db()->prepare("SELECT o.*, u.login_id, (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
+        $stmt = db()->prepare("SELECT o.*, u.login_id, u.name AS user_name, u.youtube_nickname AS user_youtube_nickname, (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
         $rows = '';
@@ -932,15 +932,25 @@ function handle_admin(string $path): never
             $paymentLabel = $order['payment_method'] === 'card' ? '카드결제' : '계좌이체';
             $dateLabel = $order['paid_at'] ? '결제 ' . dt($order['paid_at']) : '주문 ' . dt($order['created_at']);
             $cancelLabel = $order['status'] === 'cancelled' && $order['cancel_reason'] ? '<span class="table-sub">' . e($order['cancel_reason']) . '</span>' : '';
-            $rows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a><span class="table-sub">' . e($paymentLabel) . '</span></td><td><strong>' . e($order['login_id']) . '</strong><span class="table-sub">' . e($order['item_names'] ?: '상품 정보 없음') . '</span></td><td><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span>' . $cancelLabel . '</td><td class="amount">' . won($order['total_amount']) . '</td><td><span class="table-sub">' . e($dateLabel) . '</span>' . ($order['cancelled_at'] ? '<span class="table-sub">취소 ' . e(dt($order['cancelled_at'])) . '</span>' : '') . '</td></tr>';
+            $memberName = trim((string)($order['user_name'] ?: $order['login_id']));
+            $youtubeName = trim((string)($order['youtube_nickname'] ?: $order['user_youtube_nickname']));
+            $depositorName = trim((string)$order['depositor_name']);
+            $memberCell = '<strong>회원 · ' . e($memberName ?: '-') . '</strong><span class="table-sub">유튜브 · ' . e($youtubeName ?: '-') . '</span><span class="table-sub">입금자 · ' . e($depositorName ?: '-') . '</span><span class="table-sub">상품 · ' . e($order['item_names'] ?: '상품 정보 없음') . '</span>';
+            $actionCell = '';
+            if ($order['status'] === 'pending' && $order['payment_method'] === 'bank') {
+                $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm ok" type="submit" name="action" value="confirm">입금 완료</button></form>';
+            } elseif ($order['status'] === 'cancelled') {
+                $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm danger" type="submit" name="action" value="delete" data-confirm-dialog="' . e($order['order_no']) . ' 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 삭제</button></form>';
+            }
+            $rows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a><span class="table-sub">' . e($paymentLabel) . '</span></td><td class="member-cell">' . $memberCell . '</td><td><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span>' . $cancelLabel . '</td><td class="amount">' . won($order['total_amount']) . '</td><td><span class="table-sub">' . e($dateLabel) . '</span>' . ($order['cancelled_at'] ? '<span class="table-sub">취소 ' . e(dt($order['cancelled_at'])) . '</span>' : '') . '</td><td>' . $actionCell . '</td></tr>';
         }
-        if ($rows === '') $rows = '<tr><td colspan="5" class="empty-cell">조건에 맞는 주문 기록이 없습니다.</td></tr>';
+        if ($rows === '') $rows = '<tr><td colspan="6" class="empty-cell">조건에 맞는 주문 기록이 없습니다.</td></tr>';
         $productOptions = '<option value="0">전체 상품</option>';
         foreach (product_rows(true) as $product) $productOptions .= '<option value="' . (int)$product['id'] . '" ' . ($productId === (int)$product['id'] ? 'selected' : '') . '>' . e($product['name']) . '</option>';
         $statusOptionsHtml = '';
         foreach ($statusOptions as $value => $label) $statusOptionsHtml .= '<option value="' . e($value) . '" ' . ($status === $value ? 'selected' : '') . '>' . e($label) . '</option>';
         $filterHtml = '<form class="card history-filters" method="get" action="/admin/orders"><div class="filter-title"><div><h2>판매 원장</h2><p>결제 완료·배송 완료·취소·반품 기록을 주문별로 보관합니다. 상세 화면에서 처리 이력과 취소를 확인할 수 있어요.</p></div><span class="chip paid">총 ' . num(count($orders)) . '건</span></div><div class="filter-grid order-filter-grid"><label class="field"><span>상태</span><select name="status">' . $statusOptionsHtml . '</select></label><label class="field"><span>상품</span><select name="product_id">' . $productOptions . '</select></label><label class="field"><span>검색</span><input type="search" name="q" value="' . e($search) . '" placeholder="주문번호·아이디·받는 분"></label><label class="field"><span>주문 시작일</span><input type="date" name="from" value="' . e($from) . '"></label><label class="field"><span>주문 종료일</span><input type="date" name="to" value="' . e($to) . '"></label><div class="filter-submit"><button class="btn pink">필터 적용</button><a class="btn ghost" href="/admin/orders">초기화</a></div></div></form>';
-        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . '<div class="table-wrap"><table class="orders-table"><thead><tr><th>주문번호</th><th>회원 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th></tr></thead><tbody>' . $rows . '</tbody></table></div>');
+        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . '<div class="table-wrap"><table class="orders-table"><thead><tr><th>주문번호</th><th>회원 · 유튜브 · 입금자 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th><th>처리</th></tr></thead><tbody>' . $rows . '</tbody></table></div>');
     }
 
     if (preg_match('#^/admin/orders/(\d+)$#', $path, $match)) {
@@ -1228,6 +1238,7 @@ function admin_order(int $id): never
     if ($order['status'] === 'preparing') $actionButtons .= '<button class="btn pink" name="action" value="ship">배송 완료 처리</button>';
     if ($order['status'] !== 'cancelled' && $order['status'] === 'shipped') $actionButtons .= '<input type="hidden" name="cancel_kind" value="return"><button class="btn danger" name="action" value="cancel">반품 · 환불 처리</button>';
     if ($order['status'] !== 'cancelled' && $order['status'] !== 'shipped') $actionButtons .= '<label class="action-select"><span>취소 유형</span><select name="cancel_kind"><option value="cancel">주문 취소 · 환불</option><option value="return">반품 · 환불</option></select></label><button class="btn danger" name="action" value="cancel">취소 처리</button>';
+    if ($order['status'] === 'cancelled') $actionButtons .= '<button class="btn danger" name="action" value="delete" data-confirm-dialog="' . e($order['order_no']) . ' 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 자체 삭제</button>';
     if ($actionButtons === '') $actionButtons = '<span class="hint">추가로 처리할 작업이 없습니다.</span>';
     $receiptLabel = $order['cash_receipt_type'] === 'income' ? '소득공제용' : ($order['cash_receipt_type'] === 'expense' ? '지출증빙용' : '신청 안 함');
     $html = '<div class="page-head"><div><h1>주문 ' . e($order['order_no']) . '</h1><p class="page-sub">결제부터 배송 완료, 취소·반품까지 한 건의 판매 기록으로 관리합니다.</p></div><a class="btn ghost" href="/admin/orders">주문 원장</a></div><div class="order-layout"><div class="order-main"><section class="card order-card"><div class="order-card-heading"><h2>주문 상품</h2><span class="muted">' . num($itemCount) . '개 상품</span></div><div class="order-items-list">' . ($list ?: '<p class="empty">상품 정보가 없습니다.</p>') . '</div><div class="order-price-list"><div><span>상품금액</span><b class="num">' . won($order['items_amount']) . '</b></div><div><span>배송비</span><b class="num">' . ((int)$order['shipping_fee'] ? won($order['shipping_fee']) : '무료') . '</b></div>' . ((int)$order['point_used'] ? '<div><span>포인트 사용</span><b class="num discount">-' . num($order['point_used']) . 'P</b></div>' : '') . '<div class="total"><span>결제금액</span><strong class="num">' . won($order['total_amount']) . '</strong></div></div></section><section class="card order-card"><div class="order-card-heading"><h2>주문 처리 이력</h2><span class="muted">' . num($eventCount) . '건</span></div><ol class="order-history">' . $history . '</ol></section><section class="card order-card"><div class="order-card-heading"><h2>주문 메모</h2></div><p class="order-memo">' . ($order['memo'] ? nl2br(e($order['memo'])) : '남겨진 배송 메모가 없습니다.') . '</p></section></div><aside class="order-side"><section class="card order-card"><div class="order-status-line"><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span><span class="chip ' . $deliveryClass . '">' . e($deliveryInfo) . '</span></div>' . ($mergeNotice ? '<p class="order-merge">' . e($mergeNotice) . '</p>' : '') . '<dl class="order-meta"><div><dt>회원</dt><dd>' . e($order['login_id']) . '</dd></div><div><dt>받는 분</dt><dd>' . e($order['recipient_name']) . '<br>' . e($order['recipient_phone']) . '</dd></div><div><dt>주소</dt><dd>' . e(trim($order['address1'] . ' ' . $order['address2'])) . '</dd></div><div><dt>결제수단</dt><dd>' . e($order['payment_method'] === 'card' ? '카드결제' : '계좌이체') . '</dd></div><div><dt>현금영수증</dt><dd>' . e($receiptLabel) . ($order['cash_receipt_value'] ? '<br>' . e($order['cash_receipt_value']) : '') . '</dd></div></dl></section><section class="card order-card order-action-card"><h2>주문 처리</h2><p class="action-help">계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.</p><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><div class="order-actions">' . $actionButtons . '</div></form></section></aside></div>';
@@ -1243,6 +1254,16 @@ function admin_order_action(int $id, string $action, string $cancelKind = 'cance
         $stmt->execute([$id]);
         $order = $stmt->fetch();
         if (!$order) throw new RuntimeException('주문을 찾을 수 없습니다.');
+        if ($action === 'delete') {
+            if ($order['status'] !== 'cancelled') throw new RuntimeException('취소된 주문만 삭제할 수 있습니다. 먼저 주문을 취소해 주세요.');
+            if (!empty($order['shipment_request_id'])) throw new RuntimeException('출고 이력이 연결된 주문은 삭제할 수 없습니다.');
+            $pdo->prepare('UPDATE point_ledger SET order_id=NULL WHERE order_id=?')->execute([$id]);
+            $pdo->prepare('DELETE FROM payments WHERE target_type="order" AND target_id=?')->execute([$id]);
+            $pdo->prepare('DELETE FROM orders WHERE id=? AND status="cancelled"')->execute([$id]);
+            $pdo->commit();
+            flash('ok', '주문을 삭제했습니다.');
+            redirect_to('/admin/orders');
+        }
         if ($action === 'confirm' && $order['status'] === 'pending') {
             $policy = point_policy(setting_values());
             $earned = 0;
@@ -1336,12 +1357,12 @@ function admin_order_action(int $id, string $action, string $cancelKind = 'cance
             log_order_event($pdo, $id, $eventType, $oldStatus, 'cancelled', $reason . ($refundAmount > 0 ? ' · 실제 환불 필요' : ''), $refundAmount, 'admin');
         }
         $pdo->commit();
-        flash('ok', $action === 'cancel' ? '취소·반품 처리 기록을 저장했습니다.' : '주문 상태를 변경했습니다.');
+        flash('ok', $action === 'cancel' ? '취소·반품 처리 기록을 저장했습니다.' : ($action === 'confirm' ? '입금 확인 후 결제 완료로 처리했습니다.' : '주문 상태를 변경했습니다.'));
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         flash('error', $error->getMessage());
     }
-    redirect_to('/admin/orders/' . $id);
+    redirect_to(post_value('return_to') === '/admin/orders' ? '/admin/orders' : '/admin/orders/' . $id);
 }
 
 function admin_page_edit(string $slug): never

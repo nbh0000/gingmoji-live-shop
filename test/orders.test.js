@@ -310,3 +310,24 @@ test('출고 요청에 묶인 주문은 개별 취소 불가', async () => {
   await shipments.requestRelease(u, { recipient });
   await assert.rejects(orders.cancelOrder(o.id, { by: 'admin' }), (e) => e.code === 'IN_SHIPMENT');
 });
+
+test('취소된 주문만 관리자 완전 삭제 가능', async () => {
+  const pid = await makeProduct(db, { stock: 3 });
+  const u = await makeUser(db);
+  const o = await order(u, [{ productId: pid, opened: 1 }]);
+  await orders.cancelOrder(o.id, { by: 'admin' });
+
+  const deleted = await orders.deleteOrder(o.id);
+  assert.equal(deleted.id, o.id);
+  assert.equal(await db.one('SELECT id FROM orders WHERE id = ?', [o.id]), null);
+  assert.equal(await db.one('SELECT id FROM order_items WHERE order_id = ?', [o.id]), null);
+});
+
+test('취소되지 않은 주문은 관리자 완전 삭제 불가', async () => {
+  const pid = await makeProduct(db, { stock: 3 });
+  const u = await makeUser(db);
+  const o = await order(u, [{ productId: pid, opened: 1 }]);
+
+  await assert.rejects(orders.deleteOrder(o.id), (e) => e.code === 'DELETE_ONLY_CANCELLED');
+  assert.equal((await db.one('SELECT status FROM orders WHERE id = ?', [o.id])).status, 'pending');
+});

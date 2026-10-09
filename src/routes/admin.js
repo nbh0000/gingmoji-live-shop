@@ -271,6 +271,16 @@ router.post('/orders/:id/cancel', wrap(async (req, res) => {
   res.redirect(back(req, '/admin/orders'));
 }));
 
+router.post('/orders/:id/delete', wrap(async (req, res) => {
+  try {
+    const deleted = await orders.deleteOrder(parseInt(req.params.id, 10));
+    flash(req, 'ok', `${deleted.order_no} 주문을 삭제했습니다`);
+  } catch (e) {
+    if (!policyFlash(req, e)) throw e;
+  }
+  res.redirect(back(req, '/admin/orders'));
+}));
+
 router.post('/orders/:id/status', wrap(async (req, res) => {
   try {
     await orders.setStatus(parseInt(req.params.id, 10), String(req.body.status));
