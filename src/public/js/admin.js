@@ -23,7 +23,7 @@
     var box = $('[data-upload-preview="' + role + '"]');
     if (!box) return;
     var incoming = Array.prototype.slice.call(input.files || []);
-    var single = role === 'main' || role === 'full-box' || role === 'loose';
+    var single = (role === 'main' && !input.multiple) || role === 'full-box' || role === 'loose';
     var files = single ? incoming.slice(0, 1) : (input._selectedFiles || []).concat(incoming);
     var seen = {};
     files = files.filter(function (file) {
