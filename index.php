@@ -35,7 +35,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php6' : '/static/css/shop.css?v=php10';
+    $css = $admin ? '/static/css/admin.css?v=php6' : '/static/css/shop.css?v=php11';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -72,7 +72,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     }
     echo $body;
     echo '<footer class="foot"><div class="wrap"><div class="brand">깅모지</div><nav class="foot-links"><a href="/page/terms">이용약관</a><a href="/page/privacy">개인정보처리방침</a><a href="/page/refund">교환·환불 정책</a></nav><div class="biz"><span>상호 ' . e($s['biz_name']) . '</span><span>대표자 ' . e($s['biz_owner']) . '</span><br><span>사업자등록번호 ' . e($s['biz_reg_no']) . '</span><br><span>주소 ' . e($s['biz_address']) . '</span><br><span>연락처 ' . e($s['biz_phone']) . '</span></div></div></footer>';
-    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php11"></script>' . $extra . '</body></html>';
+    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php12"></script>' . $extra . '</body></html>';
     exit;
 }
 
@@ -121,7 +121,16 @@ function handle_shop(string $path): never
         $showPrice = true;
         $gallery = '';
         $packageImageIds = array_values(array_filter([(int)($product['full_box_image_id'] ?? 0), (int)($product['loose_image_id'] ?? 0)]));
-        $galleryImages = array_values(array_filter($product['images'], static fn(array $image): bool => !in_array((int)$image['id'], $packageImageIds, true)));
+        $galleryImages = [];
+        $seenGalleryHashes = [];
+        foreach ($product['images'] as $image) {
+            if (in_array((int)$image['id'], $packageImageIds, true)) continue;
+            $hash = (string)($image['image_hash'] ?? '');
+            $key = $hash !== '' ? $hash : 'id:' . (int)$image['id'];
+            if (isset($seenGalleryHashes[$key])) continue;
+            $seenGalleryHashes[$key] = true;
+            $galleryImages[] = $image;
+        }
         foreach (array_slice($galleryImages, 0, 3) as $image) {
             $gallery .= '<div class="thumb"><img src="/img/' . (int)$image['id'] . '" alt="' . e($product['name']) . '"></div>';
         }
@@ -142,7 +151,7 @@ function handle_shop(string $path): never
             $packageHtml = '<div class="detail-package-box"><div class="detail-option-label"><strong>상품 구성을 골라 주세요</strong><span>풀박 또는 낱박</span></div><div class="detail-package-options"><label class="detail-package-option"><input type="radio" name="detailPackage" value="full" checked><span class="package-option-content"><span class="package-option-image">' . $fullImage . '</span><span><strong>풀박</strong><small>풀박스 구성</small><b>' . $compactPackagePrice($fullBoxPrice) . '</b></span></span></label><label class="detail-package-option"><input type="radio" name="detailPackage" value="loose"><span class="package-option-content"><span class="package-option-image">' . $looseImage . '</span><span><strong>낱박</strong><small>패키지 내 개별 상품</small><b>' . $compactPackagePrice($loosePrice) . '</b></span></span></label></div></div>';
         }
         $detailImages = '';
-        foreach (array_slice($galleryImages, 2) as $image) {
+        foreach (array_slice($galleryImages, 3) as $image) {
             $detailImages .= '<img class="detail-image" src="/img/' . (int)$image['id'] . '" alt="' . e($product['name']) . ' 상세 이미지" loading="lazy">';
         }
         $detailImages = $detailImages ? '<div class="detail-images" aria-label="상품 상세 이미지">' . $detailImages . '</div>' : '';
@@ -158,8 +167,8 @@ function handle_shop(string $path): never
         $body .= '</div>';
         $body .= $packageHtml;
         if (!empty($product['expected_shipping_text'])) $body .= '<p class="expected-shipping">예상 배송일 <strong>' . e($product['expected_shipping_text']) . '</strong></p>';
-        if ($product['description']) {
-            $body .= '<div class="p-desc">' . nl2br(e($product['description'])) . '</div>';
+        if (!empty($product['short_description'])) {
+            $body .= '<div class="p-desc">' . nl2br(e($product['short_description'])) . '</div>';
         }
         $optionHtml = '';
         if ($product['use_open_option']) {
@@ -168,6 +177,11 @@ function handle_shop(string $path): never
             $optionHtml = '<div class="detail-field"><span>수량</span><div class="detail-qty"><button type="button" id="detailMinus" aria-label="수량 줄이기">−</button><input id="detailQty" type="number" min="1" max="' . max(1, (int)$product['stock']) . '" value="1"><button type="button" id="detailPlus" aria-label="수량 늘리기">+</button></div></div>';
         }
         $body .= '<div class="detail-option-box">' . $optionHtml . '</div><div class="detail-total"><span>TOTAL</span><strong id="detailTotal">' . ($showPrice ? won($product['price']) : '방송 중 공개') . '</strong></div><div class="detail-actions"><button class="btn big soft" type="button" id="detailCartAdd">장바구니 담기</button><button class="btn big" type="button" id="detailBuyNow">바로 구매</button></div></section></div><nav class="detail-tabs" aria-label="상품 상세 메뉴"><a class="on" href="#detail-description">DETAIL</a></nav><section class="detail-description" id="detail-description"><h2>상품 상세정보</h2>' . $detailImages . ($product['description'] ? '<div class="p-desc detail-description-text">' . nl2br(e($product['description'])) . '</div>' : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>') . '</section></main>';
+        if ($detailImages !== '') {
+            $legacyDetailMarkup = $product['description'] ? '<div class="p-desc detail-description-text">' . nl2br(e($product['description'])) . '</div>' : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>';
+            $orderedDetailMarkup = $product['description'] ? '<div class="p-desc detail-description-text">' . nl2br(e($product['description'])) . '</div>' . $detailImages : '<p class="detail-empty">상품 상세 설명을 준비 중입니다.</p>' . $detailImages;
+            $body = str_replace($detailImages . $legacyDetailMarkup, $orderedDetailMarkup, $body);
+        }
         $detailId = (int)$product['id'];
         $detailName = json_encode($product['name'], JSON_UNESCAPED_UNICODE);
         $detailImage = !empty($galleryImages[0]['id']) ? (int)$galleryImages[0]['id'] : 'null';
@@ -177,6 +191,48 @@ function handle_shop(string $path): never
         $detailScript = <<<'HTML'
 <script>
 (function () {
+  var gallery = document.querySelector('.detail-gallery');
+  if (gallery) {
+    var slides = Array.prototype.slice.call(gallery.querySelectorAll('.thumb'));
+    if (slides.length > 1) {
+      var viewport = document.createElement('div');
+      viewport.className = 'detail-gallery-viewport';
+      gallery.parentNode.insertBefore(viewport, gallery);
+      viewport.appendChild(gallery);
+      var prev = document.createElement('button');
+      var next = document.createElement('button');
+      prev.type = 'button';
+      next.type = 'button';
+      prev.className = 'gallery-nav prev';
+      next.className = 'gallery-nav next';
+      prev.setAttribute('aria-label', 'Previous image');
+      next.setAttribute('aria-label', 'Next image');
+      prev.textContent = String.fromCharCode(8249);
+      next.textContent = String.fromCharCode(8250);
+      gallery.parentNode.parentNode.appendChild(prev);
+      gallery.parentNode.parentNode.appendChild(next);
+      var galleryIndex = 0;
+      var syncGallery = function () {
+        gallery.style.transform = 'translateX(-' + (galleryIndex * 100) + '%)';
+        viewport.style.height = slides[galleryIndex].offsetHeight + 'px';
+        prev.disabled = galleryIndex === 0;
+        next.disabled = galleryIndex === slides.length - 1;
+        gallery.setAttribute('aria-label', 'Product image ' + (galleryIndex + 1) + ' of ' + slides.length);
+      };
+      prev.addEventListener('click', function () {
+        if (galleryIndex > 0) { galleryIndex -= 1; syncGallery(); }
+      });
+      next.addEventListener('click', function () {
+        if (galleryIndex < slides.length - 1) { galleryIndex += 1; syncGallery(); }
+      });
+      window.addEventListener('resize', syncGallery);
+      slides.forEach(function (slide) {
+        var image = slide.querySelector('img');
+        if (image) image.addEventListener('load', syncGallery);
+      });
+      syncGallery();
+    }
+  }
   var cartAdd = document.getElementById('detailCartAdd');
   var buyNow = document.getElementById('detailBuyNow');
   if (!cartAdd || !buyNow) return;
@@ -908,7 +964,7 @@ function handle_admin(string $path): never
 
 function admin_product_v2(int $id): never
 {
-    $product = $id ? one_product($id) : ['id' => 0, 'name' => '', 'description' => '', 'section' => 'live', 'price' => 0, 'full_box_price' => 0, 'loose_price' => 0, 'full_box_image_id' => 0, 'loose_image_id' => 0, 'expected_shipping_text' => '', 'stock' => 0, 'use_package_option' => 0, 'use_open_option' => 1, 'is_visible' => 1, 'is_soldout' => 0, 'images' => []];
+    $product = $id ? one_product($id) : ['id' => 0, 'name' => '', 'short_description' => '', 'description' => '', 'section' => 'live', 'price' => 0, 'full_box_price' => 0, 'loose_price' => 0, 'full_box_image_id' => 0, 'loose_image_id' => 0, 'expected_shipping_text' => '', 'stock' => 0, 'use_package_option' => 0, 'use_open_option' => 1, 'is_visible' => 1, 'is_soldout' => 0, 'images' => []];
     if (!$product) {
         http_response_code(404);
         admin_shell('상품 없음', '<div class="card">상품을 찾을 수 없습니다.</div>');
@@ -919,11 +975,17 @@ function admin_product_v2(int $id): never
             flash('ok', '상품을 삭제했습니다.');
             redirect_to('/admin/products');
         }
-        $data = [trim((string)post_value('name')), trim((string)post_value('description')), post_value('section') === 'sample' ? 'sample' : 'live', max(0, (int)post_value('price')), max(0, (int)post_value('full_box_price')), max(0, (int)post_value('loose_price')), trim((string)post_value('expected_shipping_text')), max(0, (int)post_value('stock')), isset($_POST['use_package_option']) ? 1 : 0, isset($_POST['use_open_option']) ? 1 : 0, isset($_POST['is_visible']) ? 1 : 0, isset($_POST['is_soldout']) ? 1 : 0];
+        if ($id && isset($_POST['image_action'])) {
+            $parts = explode(':', (string)$_POST['image_action'], 2);
+            manage_product_gallery_image($id, (string)($parts[0] ?? ''), (int)($parts[1] ?? 0));
+            flash('ok', '이미지 구성이 저장되었습니다.');
+            redirect_to('/admin/products/' . $id);
+        }
+        $data = [trim((string)post_value('name')), trim((string)post_value('short_description')), trim((string)post_value('description')), post_value('section') === 'sample' ? 'sample' : 'live', max(0, (int)post_value('price')), max(0, (int)post_value('full_box_price')), max(0, (int)post_value('loose_price')), trim((string)post_value('expected_shipping_text')), max(0, (int)post_value('stock')), isset($_POST['use_package_option']) ? 1 : 0, isset($_POST['use_open_option']) ? 1 : 0, isset($_POST['is_visible']) ? 1 : 0, isset($_POST['is_soldout']) ? 1 : 0];
         if ($id) {
-            db()->prepare('UPDATE products SET name=?,description=?,section=?,price=?,full_box_price=?,loose_price=?,expected_shipping_text=?,stock=?,use_package_option=?,use_open_option=?,is_visible=?,is_soldout=? WHERE id=?')->execute([...$data, $id]);
+            db()->prepare('UPDATE products SET name=?,short_description=?,description=?,section=?,price=?,full_box_price=?,loose_price=?,expected_shipping_text=?,stock=?,use_package_option=?,use_open_option=?,is_visible=?,is_soldout=? WHERE id=?')->execute([...$data, $id]);
         } else {
-            $stmt = db()->prepare('INSERT INTO products (name,description,section,price,full_box_price,loose_price,expected_shipping_text,stock,use_package_option,use_open_option,is_visible,is_soldout,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            $stmt = db()->prepare('INSERT INTO products (name,short_description,description,section,price,full_box_price,loose_price,expected_shipping_text,stock,use_package_option,use_open_option,is_visible,is_soldout,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
             $stmt->execute([...$data, (int)db()->query('SELECT COALESCE(MAX(sort_order),0)+10 FROM products')->fetchColumn()]);
             $id = (int)db()->lastInsertId();
         }
@@ -937,19 +999,25 @@ function admin_product_v2(int $id): never
         redirect_to('/admin/products?saved=1');
     }
 
-    $mainImage = $product['images'][0] ?? null;
+    $packageImageIds = array_values(array_filter([(int)($product['full_box_image_id'] ?? 0), (int)($product['loose_image_id'] ?? 0)]));
+    $galleryAdminImages = array_values(array_filter($product['images'], static fn(array $image): bool => !in_array((int)$image['id'], $packageImageIds, true)));
+    $mainImage = $galleryAdminImages[0] ?? null;
     $mainPreview = $mainImage
         ? '<figure class="upload-preview-card main"><img src="/img/' . (int)$mainImage['id'] . '" alt="현재 메인 이미지"><figcaption>현재 메인 이미지</figcaption></figure>'
         : '<p class="upload-empty">등록된 메인 이미지가 없습니다.</p>';
     $detailPreview = '';
-    foreach (array_slice($product['images'], 1) as $image) {
-        $detailPreview .= '<figure class="upload-preview-card"><img src="/img/' . (int)$image['id'] . '" alt="현재 상세 이미지"><figcaption>현재 상세 이미지</figcaption></figure>';
+    foreach (array_slice($galleryAdminImages, 1) as $index => $image) {
+        $imageId = (int)$image['id'];
+        $detailPreview .= '<figure class="upload-preview-card media-manager-card"><img src="/img/' . $imageId . '" alt="현재 상세 이미지"><figcaption>' . ($index + 1) . '번째 이미지</figcaption><div class="media-manager-actions"><button class="btn sm ghost" type="submit" name="image_action" value="up:' . $imageId . '"' . ($index === 0 ? ' disabled' : '') . '>위로</button><button class="btn sm ghost" type="submit" name="image_action" value="down:' . $imageId . '"' . ($index === count($galleryAdminImages) - 2 ? ' disabled' : '') . '>아래로</button><button class="btn sm danger" type="submit" name="image_action" value="delete:' . $imageId . '" data-confirm="이 상세 이미지를 삭제할까요?">삭제</button></div></figure>';
     }
     if ($detailPreview === '') $detailPreview = '<p class="upload-empty">등록된 상세 이미지가 없습니다.</p>';
     $fullBoxPreview = !empty($product['full_box_image_id']) ? '<figure class="upload-preview-card"><img src="/img/' . (int)$product['full_box_image_id'] . '" alt="현재 풀박 이미지"><figcaption>현재 풀박 이미지</figcaption></figure>' : '<p class="upload-empty">등록된 풀박 이미지가 없습니다.</p>';
     $loosePreview = !empty($product['loose_image_id']) ? '<figure class="upload-preview-card"><img src="/img/' . (int)$product['loose_image_id'] . '" alt="현재 낱박 이미지"><figcaption>현재 낱박 이미지</figcaption></figure>' : '<p class="upload-empty">등록된 낱박 이미지가 없습니다.</p>';
 
     $html = '<div class="page-head"><h1><a href="/admin/products">상품·재고</a> · ' . ($id ? '수정' : '등록') . '</h1></div><form method="post" enctype="multipart/form-data" class="card"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><label class="field"><span>상품명</span><input name="name" value="' . e($product['name']) . '" required></label><label class="field"><span>기본 가격</span><input type="number" name="price" value="' . (int)$product['price'] . '" min="0"></label><label class="field"><span>재고</span><input type="number" name="stock" value="' . (int)$product['stock'] . '" min="0"></label><label class="field"><span>구분</span><select name="section"><option value="live" ' . ($product['section'] !== 'sample' ? 'selected' : '') . '>라이브</option><option value="sample" ' . ($product['section'] === 'sample' ? 'selected' : '') . '>샘플</option></select></label><label><input type="checkbox" name="use_package_option" ' . ($product['use_package_option'] ? 'checked' : '') . '> 풀박/낱박 선택 사용</label><label class="field"><span>풀박 가격 (원)</span><input type="number" name="full_box_price" value="' . (int)$product['full_box_price'] . '" min="0"><small>고객 화면에는 19.9만원처럼 간결하게 표시됩니다.</small></label><label class="field"><span>낱박 가격 (원)</span><input type="number" name="loose_price" value="' . (int)$product['loose_price'] . '" min="0"><small>고객 화면에는 2.2만원처럼 간결하게 표시됩니다.</small></label><label class="field"><span>예상 배송일</span><input name="expected_shipping_text" value="' . e($product['expected_shipping_text'] ?? '') . '" placeholder="예: 결제 후 3~5일"><small>상품 상세페이지에 고객에게 표시됩니다.</small></label><label><input type="checkbox" name="use_open_option" ' . ($product['use_open_option'] ? 'checked' : '') . '> 개봉/미개봉 옵션</label><label><input type="checkbox" name="is_visible" ' . ($product['is_visible'] ? 'checked' : '') . '> 고객에게 노출</label><label><input type="checkbox" name="is_soldout" ' . ($product['is_soldout'] ? 'checked' : '') . '> 품절 처리</label><section class="upload-section"><h2 class="form-section">상품 이미지</h2><label class="field"><span>메인 이미지 (1장)</span><input type="file" name="main_image" accept="image/*" data-image-upload="main"><small>상품 목록과 상세 상단에 대표로 노출됩니다.</small></label><div class="upload-preview" data-upload-preview="main">' . $mainPreview . '</div><div class="package-media-grid"><div><label class="field"><span>풀박 선택 이미지 (1장)</span><input type="file" name="full_box_image" accept="image/*" data-image-upload="full-box"><small>상세페이지 풀박 선택지 앞에 표시됩니다.</small></label><div class="upload-preview" data-upload-preview="full-box">' . $fullBoxPreview . '</div></div><div><label class="field"><span>낱박 선택 이미지 (1장)</span><input type="file" name="loose_image" accept="image/*" data-image-upload="loose"><small>상세페이지 낱박 선택지 앞에 표시됩니다.</small></label><div class="upload-preview" data-upload-preview="loose">' . $loosePreview . '</div></div></div><label class="field"><span>상세 이미지 (여러 장)</span><input type="file" name="images[]" accept="image/*" multiple data-image-upload="detail"><small>여러 장을 한 번에 선택할 수 있습니다. 기존 이미지 아래에 계속 추가됩니다.</small></label><div class="upload-preview" data-upload-preview="detail">' . $detailPreview . '</div></section><label class="field"><span>상세 설명 (이미지 아래 줄글)</span><textarea name="description" rows="8" placeholder="상품 크기, 구성, 특징 등을 입력해 주세요.">' . e($product['description']) . '</textarea></label><div class="save-bar">' . ($id ? '<button class="btn danger" name="delete" value="1">삭제</button>' : '') . '<button class="btn pink">저장</button></div></form>';
+    $summaryField = '<label class="field"><span>메인 상품 설명</span><textarea name="short_description" rows="5" placeholder="상품명 아래에 보여줄 짧은 설명을 입력해 주세요.">' . e($product['short_description'] ?? '') . '</textarea><small>상품 상세 상단에서 옵션과 수량 선택 전에 보여집니다.</small></label>';
+    $html = preg_replace('/<label class="field"><span>[^<]*<\/span><textarea name="description"/', '<label class="field"><span>상세 설명</span><textarea name="description"', $html, 1) ?? $html;
+    $html = str_replace('<section class="upload-section">', $summaryField . '<section class="upload-section">', $html);
     $html = str_replace('name="main_image" accept="image/*" data-image-upload="main"', 'name="main_images[]" accept="image/*" multiple data-image-upload="main"', $html);
     $html = str_replace('name="use_package_option"', 'name="use_package_option" data-package-toggle', $html);
     $html = str_replace('<label class="field"><span>메인 이미지 (1장)</span>', '<label><input type="checkbox" name="replace_images"> 기존 대표·상세 이미지를 교체하고 새 순서로 저장</label><label class="field"><span>대표 이미지 (여러 장)</span>', $html);
@@ -962,6 +1030,29 @@ function replace_product_images_v2(int $productId): void
 {
     db()->prepare('UPDATE products SET full_box_image_id = NULL, loose_image_id = NULL WHERE id = ?')->execute([$productId]);
     db()->prepare('DELETE FROM product_images WHERE product_id = ?')->execute([$productId]);
+}
+
+function manage_product_gallery_image(int $productId, string $action, int $imageId): void
+{
+    if ($imageId < 1 || !in_array($action, ['up', 'down', 'delete'], true)) return;
+    $product = one_product($productId);
+    if (!$product) return;
+    $packageIds = array_values(array_filter([(int)($product['full_box_image_id'] ?? 0), (int)($product['loose_image_id'] ?? 0)]));
+    $gallery = array_values(array_filter($product['images'], static fn(array $image): bool => !in_array((int)$image['id'], $packageIds, true)));
+    $ids = array_map(static fn(array $image): int => (int)$image['id'], $gallery);
+    $index = array_search($imageId, $ids, true);
+    if ($index === false) return;
+    if ($action === 'delete') {
+        db()->prepare('DELETE FROM product_images WHERE id = ? AND product_id = ?')->execute([$imageId, $productId]);
+        return;
+    }
+    $next = $action === 'up' ? $index - 1 : $index + 1;
+    if ($next < 0 || $next >= count($gallery)) return;
+    [$gallery[$index], $gallery[$next]] = [$gallery[$next], $gallery[$index]];
+    $packageImages = array_values(array_filter($product['images'], static fn(array $image): bool => in_array((int)$image['id'], $packageIds, true)));
+    $ordered = array_merge($gallery, $packageImages);
+    $stmt = db()->prepare('UPDATE product_images SET sort_order = ? WHERE id = ? AND product_id = ?');
+    foreach ($ordered as $sort => $image) $stmt->execute([$sort, (int)$image['id'], $productId]);
 }
 
 function uploaded_image_v2(string $field, int $index = 0): ?array

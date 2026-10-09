@@ -25,7 +25,7 @@ router.get('/api/live', wrap(async (req, res) => {
 // 상품 바텀시트용 상세
 router.get('/api/products/:id', wrap(async (req, res) => {
   const p = await db.one(
-    'SELECT id, name, description, price, stock, use_open_option, is_soldout FROM products WHERE id = ? AND deleted_at IS NULL AND is_visible = 1',
+    'SELECT id, name, short_description, description, price, stock, use_open_option, is_soldout FROM products WHERE id = ? AND deleted_at IS NULL AND is_visible = 1',
     [parseInt(req.params.id, 10)]
   );
   if (!p) return res.status(404).json({ ok: false, message: '판매하지 않는 상품입니다' });
@@ -37,6 +37,7 @@ router.get('/api/products/:id', wrap(async (req, res) => {
     product: {
       id: p.id,
       name: p.name,
+      shortDescription: p.short_description || '',
       description: p.description || '',
       price: live.priceVisible(s) ? p.price : null,
       stock: Math.max(0, p.stock),

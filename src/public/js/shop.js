@@ -212,7 +212,7 @@
         '</div>' +
         packageHtml +
         (p.expectedShippingText ? '<p class="expected-shipping">예상 배송일 <strong>' + esc(p.expectedShippingText) + '</strong></p>' : '') +
-        (p.description ? '<div class="p-desc">' + esc(p.description) + '</div>' : '') +
+        (p.shortDescription ? '<div class="p-desc">' + esc(p.shortDescription) + '</div>' : '') +
         '<div class="opt-box" data-ps-opts></div>';
       var opts = $('[data-ps-opts]', body);
       $$('input[name="sheetPackage"]', body).forEach(function (radio) {

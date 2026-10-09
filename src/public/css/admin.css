@@ -265,6 +265,10 @@ tr.dragging td { background: var(--pink-ll); }
 .upload-preview-card.main { width: 220px; }
 .upload-preview-card.main img { width: 220px; height: 160px; }
 .upload-preview-card figcaption { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-manager-card { width: 180px; }
+.media-manager-card img { width: 180px; height: 150px; object-fit: contain; }
+.media-manager-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.media-manager-actions .btn { min-height: 28px; padding: 0 8px; font-size: 11px; }
 .upload-empty { margin: 0; color: var(--muted); font-size: 13px; }
 .admin-modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(20, 16, 17, .42); }
 .admin-modal-card { width: min(360px, 100%); padding: 30px 24px 24px; border-radius: 24px; background: var(--card); box-shadow: 0 24px 70px rgba(20, 16, 17, .22); text-align: center; }

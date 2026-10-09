@@ -308,7 +308,7 @@ function one_product(int $id): ?array
     $stmt->execute([$id]);
     $row = $stmt->fetch();
     if (!$row) return null;
-    $stmt = db()->prepare('SELECT id,sort_order FROM product_images WHERE product_id=? ORDER BY sort_order,id');
+    $stmt = db()->prepare('SELECT id,sort_order,MD5(data) AS image_hash FROM product_images WHERE product_id=? ORDER BY sort_order,id');
     $stmt->execute([$id]);
     $row['images'] = $stmt->fetchAll();
     return $row;
