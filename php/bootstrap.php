@@ -297,9 +297,30 @@ function points_for(float $items, float $used, float $rate): int
 function product_rows(bool $admin = false): array
 {
     $sql = $admin
-        ? "SELECT p.*, (SELECT i.id FROM product_images i WHERE i.product_id=p.id ORDER BY i.sort_order,i.id LIMIT 1) image_id, (SELECT COALESCE(SUM(oi.qty),0) FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=p.id AND o.status='pending') reserved_qty FROM products p WHERE p.deleted_at IS NULL ORDER BY p.sort_order,p.id"
-        : "SELECT p.id,p.name,p.description,p.section,p.price,p.full_box_price,p.loose_price,p.stock,p.use_package_option,p.use_open_option,p.is_soldout,p.sort_order,(SELECT i.id FROM product_images i WHERE i.product_id=p.id ORDER BY i.sort_order,i.id LIMIT 1) image_id FROM products p WHERE p.deleted_at IS NULL AND p.is_visible=1 ORDER BY p.sort_order,p.id";
+        ? "SELECT p.*, COALESCE(p.main_image_id,(SELECT i.id FROM product_images i WHERE i.product_id=p.id ORDER BY i.sort_order,i.id LIMIT 1)) image_id, (SELECT COALESCE(SUM(IF(oi.stock_qty>0,oi.stock_qty,oi.qty)),0) FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.product_id=p.id AND o.status='pending') reserved_qty FROM products p WHERE p.deleted_at IS NULL ORDER BY p.sort_order,p.id"
+        : "SELECT p.id,p.name,p.description,p.section,p.price,p.full_box_price,p.loose_price,p.full_box_qty,p.stock,p.use_package_option,p.use_open_option,p.is_soldout,p.sort_order,COALESCE(p.main_image_id,(SELECT i.id FROM product_images i WHERE i.product_id=p.id ORDER BY i.sort_order,i.id LIMIT 1)) image_id FROM products p WHERE p.deleted_at IS NULL AND p.is_visible=1 ORDER BY p.sort_order,p.id";
     return db()->query($sql)->fetchAll();
+}
+
+// 재고는 낱개 기준. 풀박 1개를 사면 풀박 개수(full_box_qty)만큼 차감한다.
+function package_units(array $product, string $packageType): int
+{
+    if ($packageType !== 'full' || !(int)($product['use_package_option'] ?? 0)) return 1;
+    return max(1, (int)($product['full_box_qty'] ?? 1));
+}
+
+// 대표 이미지(1장)와 상세 이미지를 나눈다. 풀박·낱박 선택 이미지는 둘 다에서 뺀다.
+function product_image_split(array $product): array
+{
+    $packageIds = array_values(array_filter([(int)($product['full_box_image_id'] ?? 0), (int)($product['loose_image_id'] ?? 0)]));
+    $images = array_values(array_filter($product['images'] ?? [], static fn(array $image): bool => !in_array((int)$image['id'], $packageIds, true)));
+    $mainId = (int)($product['main_image_id'] ?? 0);
+    $main = null;
+    foreach ($images as $image) {
+        if ((int)$image['id'] === $mainId) { $main = $image; break; }
+    }
+    $details = array_values(array_filter($images, static fn(array $image): bool => !$main || (int)$image['id'] !== (int)$main['id']));
+    return ['main' => $main, 'details' => $details];
 }
 
 function one_product(int $id): ?array
