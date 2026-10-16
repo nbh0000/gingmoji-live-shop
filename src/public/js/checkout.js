@@ -10,6 +10,18 @@
   function delivery() { return ($('input[name="delivery"]:checked') || {}).value || 'direct'; }
   function payment() { return ($('input[name="payment"]:checked') || {}).value || ''; }
   function includeKept() { var el = $('[name="includeKept"]'); return !!(el && el.checked && delivery() === 'direct'); }
+  function mergeOption() { var el = $('input[name="mergeOrderId"]:checked'); return el && delivery() === 'direct' && parseInt(el.value, 10) > 0 ? el : null; }
+  function mergeOrderId() { var el = mergeOption(); return el ? parseInt(el.value, 10) : 0; }
+  var ADDR_KEYS = ['name', 'phone', 'zipcode', 'address1', 'address2'];
+  var addrOriginal = {}, addrReadOnly = {};
+  ADDR_KEYS.forEach(function (k) {
+    var i = $('[name="' + k + '"]');
+    addrOriginal[k] = i ? i.value : '';
+    addrReadOnly[k] = i ? i.readOnly : false;
+  });
+  var saveAddress = $('[name="saveAddress"]');
+  var saveAddressChoice = saveAddress ? saveAddress.checked : false;
+  var mergeWasActive = false;
   function pointUse() { var el = $('[data-point-input]'); return el ? parseInt(el.value.replace(/[^0-9]/g, ''), 10) || 0 : 0; }
   function cashReceipt() {
     var type = ($('input[name="cashReceiptType"]:checked') || {}).value || 'none';
@@ -18,11 +30,12 @@
 
   function syncCashReceipt() {
     var box = $('[data-cash-receipt]');
-    if (!box) return;
     var type = ($('input[name="cashReceiptType"]:checked') || {}).value || 'none';
     var value = $('[data-cash-receipt-value]', box);
-    box.hidden = payment() !== 'bank';
+    if (box) box.hidden = payment() !== 'bank';
     if (value) value.hidden = payment() !== 'bank' || type === 'none';
+    var depositor = $('[name="depositorName"]');
+    if (depositor) depositor.required = payment() === 'bank';
   }
 
   function renderLines(q) {
@@ -46,12 +59,16 @@
   function renderSummary(q) {
     var sm = q && q.summary;
     $('[data-sum-items]').textContent = sm ? S.won(sm.itemsAmount) : '-';
-    $('[data-sum-ship]').textContent = sm ? (sm.deliveryType === 'keep' ? '킵 (지금 무료)' : (sm.shippingFee ? S.won(sm.shippingFee) : '무료')) : '-';
+    var mo = sm && sm.mergeOrder;
+    $('[data-sum-ship]').textContent = sm ? (sm.deliveryType === 'keep' ? '킵 (지금 무료)' : (mo ? '무료 (합배송)' : (sm.shippingFee ? S.won(sm.shippingFee) : '무료'))) : '-';
     var pr = $('[data-sum-point-row]');
     if (pr) { pr.hidden = !(sm && sm.pointUsed); $('[data-sum-point]').textContent = sm ? '-' + sm.pointUsed.toLocaleString('ko-KR') + 'P' : ''; }
     $('[data-sum-total]').textContent = sm ? S.won(sm.total) : '-';
     var hint = $('[data-free-hint]');
-    if (sm && sm.deliveryType === 'direct' && sm.remainingForFree > 0) {
+    if (mo) {
+      hint.hidden = false;
+      hint.textContent = '주문 ' + mo.orderNo + '과 함께 보내드려요. 배송비가 다시 붙지 않아요.';
+    } else if (sm && sm.deliveryType === 'direct' && sm.remainingForFree > 0) {
       hint.hidden = false;
       hint.innerHTML = (sm.includeKept && sm.keptAmount ? '킵 ' + S.won(sm.keptAmount) + '을 합산해도 ' : '') + '<b style="color:var(--pink-dd)">' + S.won(sm.remainingForFree) + '</b> 더 담으면 무료배송이에요';
     } else if (sm && sm.deliveryType === 'keep') {
@@ -68,12 +85,49 @@
   function syncKeepMerge() {
     var box = $('[data-keep-merge]');
     if (!box) return;
-    var enabled = delivery() === 'direct';
+    var enabled = delivery() === 'direct' && !mergeOption();
     box.hidden = !enabled;
     if (!enabled) {
       var input = $('[name="includeKept"]', box);
       if (input) input.checked = false;
     }
+  }
+
+  // 발송 대기 주문에 추가: 바로배송일 때만 보이고, 선택하면 받는 분 정보를 그 주문과 맞춘다
+  function syncOrderMerge() {
+    var box = $('[data-order-merge]');
+    if (box) box.hidden = delivery() !== 'direct';
+    var opt = mergeOption();
+    var hint = $('[data-merge-addr-hint]');
+    var addressSearch = $('[data-address-search]');
+    if (box) {
+      ADDR_KEYS.forEach(function (k) {
+        var i = $('[name="' + k + '"]');
+        if (i) {
+          i.value = opt ? (opt.getAttribute('data-merge-' + k) || '') : addrOriginal[k];
+          i.readOnly = opt ? true : addrReadOnly[k];
+        }
+      });
+    }
+    if (opt && !mergeWasActive && saveAddress) saveAddressChoice = saveAddress.checked;
+    if (saveAddress) {
+      saveAddress.checked = opt ? false : saveAddressChoice;
+      saveAddress.disabled = !!opt;
+      saveAddress.closest('label').hidden = !!opt;
+    }
+    if (addressSearch) addressSearch.hidden = !!opt;
+    mergeWasActive = !!opt;
+    if (hint) {
+      hint.hidden = !opt;
+      if (opt) hint.textContent = '주문 ' + opt.getAttribute('data-merge-no') + '의 받는 분·주소를 그대로 사용해 함께 보내드려요.';
+    }
+    syncKeepMerge();
+  }
+
+  function resetMergeChoice() {
+    var none = $('input[name="mergeOrderId"][value="0"]');
+    if (none) none.checked = true;
+    syncOrderMerge();
   }
 
   function syncButton() {
@@ -91,8 +145,15 @@
   function refresh() {
     var cart = S.load();
     if (!cart.length) { quote = { lines: [] }; renderLines(quote); renderSummary(null); return; }
-    S.api('POST', '/api/cart/quote', { lines: S.toLines(cart), deliveryType: delivery(), includeKept: includeKept(), pointUse: pointUse() })
+    var wantedMerge = mergeOrderId();
+    S.api('POST', '/api/cart/quote', { lines: S.toLines(cart), deliveryType: delivery(), includeKept: includeKept(), mergeOrderId: wantedMerge, pointUse: pointUse() })
       .then(function (q) {
+        if (wantedMerge && !(q.summary && q.summary.mergeOrder)) {
+          S.toast('선택한 주문이 더 이상 발송 대기 상태가 아니에요', 'error');
+          resetMergeChoice();
+          refresh();
+          return;
+        }
         var byId = {};
         q.lines.forEach(function (l) { byId[l.productId + ':' + (l.packageType || 'standard')] = l; });
         cart = cart.filter(function (l) { return !!byId[l.productId + ':' + (l.packageType || 'standard')]; });
@@ -105,7 +166,8 @@
       .catch(function (e) { S.toast(e.message, 'error'); });
   }
 
-  $$('input[name="delivery"]').forEach(function (r) { r.addEventListener('change', function () { syncKeepMerge(); refresh(); }); });
+  $$('input[name="delivery"]').forEach(function (r) { r.addEventListener('change', function () { syncOrderMerge(); refresh(); }); });
+  $$('input[name="mergeOrderId"]').forEach(function (r) { r.addEventListener('change', function () { syncOrderMerge(); refresh(); }); });
   var keptToggle = $('[name="includeKept"]');
   if (keptToggle) keptToggle.addEventListener('change', refresh);
   $$('input[name="payment"]').forEach(function (r) {
@@ -142,12 +204,18 @@
 
   placeBtn.addEventListener('click', function () {
     if (busy) return;
+    var form = $('[data-addr-form]');
+    if (form && !form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
     if (!val('address1')) { S.toast('주소를 입력해 주세요', 'error'); return; }
     busy = true; syncButton();
     var body = {
       lines: S.toLines(),
       deliveryType: delivery(),
       includeKept: includeKept(),
+      mergeOrderId: mergeOrderId(),
       paymentMethod: payment(),
       pointUse: pointUse(),
       depositorName: val('depositorName'),
@@ -167,6 +235,6 @@
     });
   });
 
-  syncKeepMerge();
+  syncOrderMerge();
   refresh();
 })();

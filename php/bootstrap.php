@@ -4,6 +4,15 @@ declare(strict_types=1);
 date_default_timezone_set('Asia/Seoul');
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_name('gm_sid');
+    $sessionLifetime = 60 * 60 * 24 * 30;
+    ini_set('session.gc_maxlifetime', (string)$sessionLifetime);
+    session_set_cookie_params([
+        'lifetime' => $sessionLifetime,
+        'path' => '/',
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (string)($_SERVER['SERVER_PORT'] ?? '') === '443',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -50,6 +59,7 @@ function default_settings(): array
 {
     return [
         'live_on' => false,
+        'live_started_at' => '',
         'always_show_price' => false,
         'bank_name' => '케이뱅크',
         'bank_account' => '100301443318',
@@ -61,16 +71,16 @@ function default_settings(): array
         'show_stock' => false,
         'notice_text' => '',
         'event_notice_text' => '5만 원 이상 구매 시 뽑기 1회 제공',
-        'point_earn_mode' => 'flat',
-        'point_earn_rate' => 1,
-        'point_earn_threshold' => 0,
+        'point_earn_mode' => 'tier',
+        'point_earn_rate' => '',
+        'point_earn_threshold' => 300000,
         'point_earn_under_rate' => 1,
-        'point_earn_over_rate' => 1,
+        'point_earn_over_rate' => 3,
         'point_use_enabled' => true,
         'point_min_balance' => 10000,
         'point_use_unit' => 10000,
         'point_max_ratio' => 100,
-        'point_guide_text' => '포인트는 결제 금액의 1%가 자동 적립되며, 보유 10,000P 이상부터 결제 시 10,000P 단위로 자동 사용됩니다.',
+        'point_guide_text' => '라이브 누적 결제금액 30만 원 미만은 1%, 30만 원 이상이면 해당 라이브의 결제금액 전체에 3%가 자동 적립됩니다. 보유 10,000P 이상부터 결제 시 사용할 수 있습니다.',
         'cash_receipt_enabled' => true,
         'biz_name' => '깅모지',
         'biz_owner' => '김민정',
@@ -99,23 +109,34 @@ function setting_values(): array
     } catch (Throwable $e) {
         // DB 초기화 전에 기본값으로 화면을 렌더링할 수 있도록 합니다.
     }
-    // 포인트 정책은 카드/현금 구분 없이 1% 자동 적립, 10,000P 이상 자동 사용으로 고정합니다.
-    $cache['point_earn_mode'] = 'flat';
-    $cache['point_earn_rate'] = 1;
-    $cache['point_earn_threshold'] = 0;
+    // 포인트 정책은 계좌이체 주문의 라이브 세션 누적 결제금액에 따라 1%/3%로 적용합니다.
+    $cache['point_earn_mode'] = 'tier';
+    $cache['point_earn_rate'] = '';
+    $cache['point_earn_threshold'] = 300000;
     $cache['point_earn_under_rate'] = 1;
-    $cache['point_earn_over_rate'] = 1;
+    $cache['point_earn_over_rate'] = 3;
     $cache['point_use_enabled'] = true;
     $cache['point_min_balance'] = 10000;
     $cache['point_use_unit'] = 10000;
     $cache['point_max_ratio'] = 100;
-    $cache['point_guide_text'] = '포인트는 결제 금액의 1%가 자동 적립되며, 보유 10,000P 이상부터 결제 시 10,000P 단위로 자동 사용됩니다.';
+    $cache['point_guide_text'] = '라이브 누적 결제금액 30만 원 미만은 1%, 30만 원 이상이면 해당 라이브의 결제금액 전체에 3%가 자동 적립됩니다. 보유 10,000P 이상부터 결제 시 사용할 수 있습니다.';
     return $cache;
 }
 
 function save_settings(array $values): void
 {
     $defaults = default_settings();
+    if (array_key_exists('live_on', $values)) {
+        $current = setting_values();
+        $nextLive = in_array((string)$values['live_on'], ['1', 'on', 'true'], true);
+        if ($nextLive && !$current['live_on']) {
+            $values['live_started_at'] = date('Y-m-d H:i:s');
+        } elseif (!$nextLive && $current['live_on']) {
+            $values['live_started_at'] = '';
+        } elseif ($nextLive && trim((string)($current['live_started_at'] ?? '')) === '') {
+            $values['live_started_at'] = date('Y-m-d H:i:s');
+        }
+    }
     $pdo = db();
     $stmt = $pdo->prepare('INSERT INTO settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)');
     foreach ($values as $key => $value) {
@@ -270,6 +291,7 @@ function order_event_label(array $event): string
         'imported' => '기존 주문 기록 생성',
         'payment_confirmed' => '입금 확인 · 결제 완료',
         'keep_merge' => '킵 합배송 연결',
+        'merge_added' => '추가 주문 연결',
         'shipped' => '판매 완료 · 발송 완료',
         'cancelled' => '주문 취소 · 환불',
         'return_completed' => '반품 · 환불 처리',
@@ -284,14 +306,77 @@ function log_order_event(PDO $pdo, int $orderId, string $eventType, ?string $fro
     ]);
 }
 
+// 발송 대기(결제완료·바로배송) 주문 중 추가 주문을 붙일 수 있는 대상. 이미 다른 주문에 붙은 주문은 제외.
+function mergeable_paid_orders(int $userId): array
+{
+    $stmt = db()->prepare("SELECT o.*, (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names FROM orders o WHERE o.user_id=? AND o.status='paid' AND o.delivery_type='direct' AND o.merge_order_id IS NULL ORDER BY o.paid_at DESC, o.id DESC");
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll();
+}
+
+// 합배송 묶음(대표 주문 + 추가 주문). 대표 주문이 먼저 온다. 묶음이 없으면 자기 자신만 돌려준다.
+function merge_group_orders(PDO $pdo, array $order, bool $lock = false): array
+{
+    $rootId = (int)(!empty($order['merge_order_id']) ? $order['merge_order_id'] : $order['id']);
+    $stmt = $pdo->prepare('SELECT * FROM orders WHERE id=? OR merge_order_id=? ORDER BY (id=?) DESC, id' . ($lock ? ' FOR UPDATE' : ''));
+    $stmt->execute([$rootId, $rootId, $rootId]);
+    return $stmt->fetchAll();
+}
+
 function point_policy(array $s): array
 {
-    return ['mode' => 'flat', 'rate' => 1];
+    return [
+        'mode' => 'tier',
+        'threshold' => max(0, (float)($s['point_earn_threshold'] ?? 300000)),
+        'under' => max(0, (float)($s['point_earn_under_rate'] ?? 1)),
+        'over' => max(0, (float)($s['point_earn_over_rate'] ?? 3)),
+    ];
 }
 
 function points_for(float $items, float $used, float $rate): int
 {
     return (int)floor(max(0, $items - $used) * $rate / 100);
+}
+
+function active_live_session_start(array $settings): ?string
+{
+    if (empty($settings['live_on'])) return null;
+    $startedAt = trim((string)($settings['live_started_at'] ?? ''));
+    if ($startedAt !== '') return $startedAt;
+    $startedAt = date('Y-m-d H:i:s');
+    save_settings(['live_started_at' => $startedAt]);
+    return $startedAt;
+}
+
+function reconcile_live_session_points(PDO $pdo, int $userId, ?string $sessionStart, array $policy): array
+{
+    if ($sessionStart === null || trim($sessionStart) === '') {
+        return ['total' => 0, 'rate' => (float)$policy['under'], 'earned' => []];
+    }
+    $stmt = $pdo->prepare("SELECT id,order_no,items_amount,point_used,point_earned FROM orders WHERE user_id=? AND live_session_started_at=? AND payment_method='bank' AND status<>'cancelled' AND paid_at IS NOT NULL ORDER BY paid_at,id FOR UPDATE");
+    $stmt->execute([$userId, $sessionStart]);
+    $orders = $stmt->fetchAll();
+    $sessionTotal = 0;
+    foreach ($orders as $order) $sessionTotal += max(0, (int)$order['items_amount'] - (int)$order['point_used']);
+    $rate = $sessionTotal >= (float)$policy['threshold'] ? (float)$policy['over'] : (float)$policy['under'];
+    $earnedById = [];
+    foreach ($orders as $order) {
+        $earned = points_for((float)$order['items_amount'], (float)$order['point_used'], $rate);
+        $previous = (int)$order['point_earned'];
+        $delta = $earned - $previous;
+        if ($delta !== 0) {
+            $balanceStmt = $pdo->prepare('SELECT point_balance FROM users WHERE id=? FOR UPDATE');
+            $balanceStmt->execute([$userId]);
+            $before = (int)$balanceStmt->fetchColumn();
+            $after = max(0, $before + $delta);
+            $pdo->prepare('UPDATE users SET point_balance=? WHERE id=?')->execute([$after, $userId]);
+            $ledgerType = $previous > 0 ? 'adjust' : 'earn';
+            $pdo->prepare('INSERT INTO point_ledger (user_id,type,amount,balance_after,order_id,memo) VALUES (?,?,?,?,?,?)')->execute([$userId, $ledgerType, $delta, $after, $order['id'], '주문 ' . $order['order_no'] . ' 라이브 합산 적립 ' . num($rate) . '% 적용']);
+        }
+        if ($previous !== $earned) $pdo->prepare('UPDATE orders SET point_earned=? WHERE id=?')->execute([$earned, $order['id']]);
+        $earnedById[(int)$order['id']] = $earned;
+    }
+    return ['total' => $sessionTotal, 'rate' => $rate, 'earned' => $earnedById];
 }
 
 function product_rows(bool $admin = false): array

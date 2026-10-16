@@ -68,27 +68,19 @@ function addMinutes(date, min) {
   return new Date(date.getTime() + min * 60000);
 }
 
-function dayBounds(date) {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start, end };
-}
-
 /**
- * tier 적립은 같은 고객의 당일 계좌이체 구매금액을 합산합니다.
- * 기준을 넘는 순간 해당 날짜의 기존 적립도 함께 3%로 보정합니다.
+ * tier 적립은 같은 고객의 한 라이브 세션 계좌이체 구매금액을 합산합니다.
+ * 기준을 넘는 순간 해당 라이브 세션의 기존 적립도 함께 3%로 보정합니다.
  */
-async function reconcileDailyTierPoints(conn, userId, at, policy) {
-  const { start, end } = dayBounds(at);
+async function reconcileLiveSessionPoints(conn, userId, sessionStartedAt, policy) {
+  if (!sessionStartedAt) return { total: 0, rate: policy.underRate, earnedById: new Map() };
   const [rows] = await conn.query(
     `SELECT id, order_no, items_amount, point_used, point_earned
        FROM orders
       WHERE user_id = ? AND payment_method = 'bank' AND status <> 'cancelled'
-        AND paid_at >= ? AND paid_at < ?
+        AND live_session_started_at = ? AND paid_at IS NOT NULL
       ORDER BY paid_at, id FOR UPDATE`,
-    [userId, start, end]
+    [userId, sessionStartedAt]
   );
   const total = rows.reduce((sum, row) => sum + Math.max(0, row.items_amount - row.point_used), 0);
   const rate = total >= policy.threshold ? policy.overRate : policy.underRate;
@@ -104,13 +96,22 @@ async function reconcileDailyTierPoints(conn, userId, at, policy) {
         type: previous ? 'adjust' : 'earn',
         delta,
         orderId: row.id,
-        memo: `주문 ${row.order_no} 당일 합산 적립 ${rate}% 적용`,
+        memo: `주문 ${row.order_no} 라이브 합산 적립 ${rate}% 적용`,
       });
       await conn.query('UPDATE orders SET point_earned = ? WHERE id = ?', [earned, row.id]);
     }
     earnedById.set(row.id, earned);
   }
   return { total, rate, earnedById };
+}
+
+async function activeLiveSessionStart(s) {
+  if (!s.live_on) return null;
+  const existing = String(s.live_started_at || '').trim();
+  if (existing) return existing;
+  const startedAt = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().slice(0, 19).replace('T', ' ');
+  await settings.set({ live_started_at: startedAt });
+  return startedAt;
 }
 
 // ===== 주문 생성 =====
@@ -124,6 +125,7 @@ async function reconcileDailyTierPoints(conn, userId, at, policy) {
 async function createOrder(userId, input, opts = {}) {
   const s = await settings.fresh();
   if (!s.live_on && !opts.skipLiveCheck) throw new PolicyError('방송 중에만 주문할 수 있습니다', 'NOT_LIVE');
+  const liveSessionStartedAt = await activeLiveSessionStart(s);
 
   const deliveryType = input.deliveryType === 'keep' ? 'keep' : input.deliveryType === 'direct' ? 'direct' : null;
   if (!deliveryType) throw new PolicyError('배송방식을 선택해 주세요', 'NEED_DELIVERY');
@@ -143,7 +145,11 @@ async function createOrder(userId, input, opts = {}) {
   if (!recipient.name || !recipient.phone || !recipient.address1) {
     throw new PolicyError('받는 분, 휴대폰, 주소를 입력해 주세요', 'NEED_ADDRESS');
   }
-  const depositorName = String(input.depositorName || recipient.name).trim().slice(0, 50);
+  const depositorNameInput = String(input.depositorName || '').trim();
+  if (paymentMethod === 'bank' && !depositorNameInput) {
+    throw new PolicyError('입금자명을 입력해 주세요', 'NEED_DEPOSITOR_NAME');
+  }
+  const depositorName = paymentMethod === 'bank' ? depositorNameInput.slice(0, 50) : null;
   const receipt = input.cashReceipt || {};
   let cashReceiptType = paymentMethod === 'bank' && s.cash_receipt_enabled ? String(receipt.type || 'none') : 'none';
   if (!['none', 'income', 'expense'].includes(cashReceiptType)) {
@@ -216,20 +222,20 @@ async function createOrder(userId, input, opts = {}) {
         const orderNo = newNo('G');
 
         const [ins] = await conn.query(
-           `INSERT INTO orders (order_no, user_id, status, payment_method, delivery_type,
+           `INSERT INTO orders (order_no, user_id, live_session_started_at, status, payment_method, delivery_type,
               items_amount, shipping_fee, point_used, total_amount,
               recipient_name, recipient_phone, zipcode, address1, address2, memo,
               depositor_name, cash_receipt_type, cash_receipt_value, cash_receipt_status,
               youtube_nickname, reserve_expires_at, paid_at)
            VALUES (
-             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?,
              ?, ?, ?, ?,
              ?, ?, ?, ?, ?, ?,
              ?, ?, ?, ?,
              ?, ?, ?
            )`,
           [
-            orderNo, userId, status, paymentMethod, deliveryType,
+            orderNo, userId, liveSessionStartedAt, status, paymentMethod, deliveryType,
             amounts.itemsAmount, amounts.shippingFee, amounts.pointUsed, amounts.total,
             recipient.name, recipient.phone, recipient.zipcode, recipient.address1, recipient.address2, recipient.memo,
             depositorName, cashReceiptType, cashReceiptValue, cashReceiptType === 'none' ? 'not_requested' : 'requested',
@@ -293,7 +299,7 @@ async function confirmDeposit(orderId) {
     const policy = settings.pointEarnPolicy();
     let earned = 0;
     if (policy.mode === 'tier') {
-      const result = await reconcileDailyTierPoints(conn, o.user_id, now, policy);
+      const result = await reconcileLiveSessionPoints(conn, o.user_id, o.live_session_started_at, policy);
       earned = result.earnedById.get(o.id) || 0;
     } else if (policy.mode === 'flat') {
       earned = pricing.earnPoints(
@@ -449,7 +455,7 @@ async function cancelOrder(orderId, { by = 'admin', reason = 'admin', userId = n
       [new Date(), reason, o.id]
     );
     if (o.payment_method === 'bank' && o.paid_at && settings.pointEarnPolicy().mode === 'tier') {
-      await reconcileDailyTierPoints(conn, o.user_id, o.paid_at, settings.pointEarnPolicy());
+      await reconcileLiveSessionPoints(conn, o.user_id, o.live_session_started_at, settings.pointEarnPolicy());
     }
     await conn.query("UPDATE payments SET status = 'cancelled' WHERE target_type = 'order' AND target_id = ? AND status = 'ready'", [o.id]);
     return { ...o, status: 'cancelled' };

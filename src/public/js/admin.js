@@ -7,6 +7,15 @@
   var won = function (n) { return Number(n || 0).toLocaleString('ko-KR') + '원'; };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
 
+  var newOrderMarker = $('.admin-new-order-marker');
+  if (newOrderMarker) {
+    var orderNavLink = $('.nav a[href="/admin/orders"]');
+    if (orderNavLink) {
+      orderNavLink.classList.add('has-new');
+      orderNavLink.setAttribute('aria-label', '주문 관리, 확인하지 않은 신규 주문 있음');
+    }
+  }
+
   function fileKey(file) {
     return [file.name, file.size, file.lastModified].join(':');
   }

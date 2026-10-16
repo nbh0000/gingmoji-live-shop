@@ -131,6 +131,16 @@
   if (backdrop) backdrop.addEventListener('click', closeSheet);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
   $$('[data-close-sheet]').forEach(function (b) { b.addEventListener('click', closeSheet); });
+  $$('[data-open-review-sheet]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var id = button.getAttribute('data-open-review-sheet');
+      var sheet = id ? document.getElementById(id) : null;
+      if (!sheet) return;
+      openSheet(sheet);
+      var rating = $('[name="rating"]', sheet);
+      if (rating) setTimeout(function () { rating.focus(); }, 260);
+    });
+  });
 
   // 아래로 끌어서 닫기 (손잡이/헤더 영역)
   $$('.sheet').forEach(function (sheet) {
@@ -515,6 +525,50 @@
     try { document.execCommand('copy'); } catch (e) { /* ignore */ }
     document.body.removeChild(t);
   }
+
+  // ===== 리뷰 사진 선택 미리보기 =====
+  $$('[data-review-photo-input]').forEach(function (input) {
+    var field = input.closest('[data-review-photo-field]') || input.parentNode;
+    var preview = field ? $('[data-review-photo-preview]', field) : null;
+    var fileName = field ? $('[data-review-file-name]', field) : null;
+    if (!preview) return;
+    input.addEventListener('change', function () {
+      var files = Array.prototype.slice.call(input.files || []);
+      var allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (files.length > 3) {
+        input.value = '';
+        if (fileName) fileName.textContent = '선택된 사진 없음';
+        preview.innerHTML = '';
+        preview.hidden = true;
+        toast('사진은 최대 3장까지 선택할 수 있어요', 'error');
+        return;
+      }
+      if (files.some(function (file) { return !allowed.includes(file.type) || file.size > 5 * 1024 * 1024; })) {
+        input.value = '';
+        if (fileName) fileName.textContent = '선택된 사진 없음';
+        preview.innerHTML = '';
+        preview.hidden = true;
+        toast('JPG, PNG, WEBP, GIF 사진을 장당 5MB 이하로 올려 주세요', 'error');
+        return;
+      }
+      if (fileName) fileName.textContent = files.length ? files.map(function (file) { return file.name; }).join(', ') : '선택된 사진 없음';
+      preview.innerHTML = '';
+      preview.hidden = files.length === 0;
+      files.forEach(function (file) {
+        var url = URL.createObjectURL(file);
+        var frame = document.createElement('span');
+        var image = document.createElement('img');
+        frame.className = 'review-photo-preview-item';
+        image.src = url;
+        image.alt = '선택한 후기 사진';
+        image.width = 240;
+        image.height = 180;
+        image.onload = function () { URL.revokeObjectURL(url); };
+        frame.appendChild(image);
+        preview.appendChild(frame);
+      });
+    });
+  });
 
   window.addEventListener("storage", function (e) { if (e.key === KEY) renderBadge(); });
   renderBadge();

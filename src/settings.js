@@ -5,6 +5,7 @@ const db = require('./db');
 const DEFAULTS = {
   // ===== 방송 =====
   live_on: false,
+  live_started_at: '',
   // PG 심사 기간용: 방송과 무관하게 가격만 노출 (주문은 여전히 방송 중에만)
   always_show_price: false,
 
@@ -27,7 +28,7 @@ const DEFAULTS = {
   event_notice_text: '5만 원 이상 구매 시 뽑기 1회 제공',
 
   // ===== 포인트 =====
-  // flat은 기존 단일 적립률, tier는 당일 합산 금액 기준 적립률입니다.
+  // flat은 기존 단일 적립률, tier는 라이브 세션 누적 금액 기준 적립률입니다.
   point_earn_mode: 'tier',
   point_earn_rate: '',
   point_earn_threshold: 300000,
@@ -37,7 +38,7 @@ const DEFAULTS = {
   point_min_balance: 10000,
   point_use_unit: 10000,
   point_max_ratio: 100, // 상품금액 대비 최대 사용 비율(%)
-  point_guide_text: '포인트는 10,000점 이상부터 사용할 수 있으며, 적립 당일에는 사용할 수 없습니다. 10,000점 단위로 사용하고 잔여 포인트는 누적됩니다.',
+  point_guide_text: '라이브 누적 결제금액 30만 원 미만은 1%, 30만 원 이상이면 해당 라이브의 결제금액 전체에 3%가 자동 적립됩니다. 보유 10,000P 이상부터 결제 시 사용할 수 있습니다.',
 
   // ===== 현금영수증 =====
   cash_receipt_enabled: true,
@@ -61,6 +62,11 @@ for (const [k, v] of Object.entries(DEFAULTS)) TYPES[k] = typeof v;
 
 let cache = { ...DEFAULTS };
 let loadedAt = 0;
+
+function sqlDateTime(date = new Date()) {
+  const kst = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+  return kst.toISOString().slice(0, 19).replace('T', ' ');
+}
 
 function decode(key, raw) {
   const type = TYPES[key];
@@ -110,6 +116,12 @@ async function fresh() {
 
 async function set(values) {
   const nextValues = { ...values };
+  if (Object.prototype.hasOwnProperty.call(values, 'live_on')) {
+    const nextLive = values.live_on === true || values.live_on === '1' || values.live_on === 'on' || values.live_on === 'true';
+    if (nextLive && !cache.live_on) nextValues.live_started_at = sqlDateTime();
+    else if (!nextLive && cache.live_on) nextValues.live_started_at = '';
+    else if (nextLive && !String(cache.live_started_at || '').trim()) nextValues.live_started_at = sqlDateTime();
+  }
   // 기존 API/테스트에서 point_earn_rate만 보내는 경우에도 이전 동작을 유지합니다.
   if (Object.prototype.hasOwnProperty.call(values, 'point_earn_rate') && !Object.prototype.hasOwnProperty.call(values, 'point_earn_mode')) {
     nextValues.point_earn_mode = values.point_earn_rate === '' ? 'off' : 'flat';

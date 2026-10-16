@@ -3,6 +3,37 @@ declare(strict_types=1);
 
 require __DIR__ . '/php/bootstrap.php';
 
+$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if (str_starts_with($requestPath, '/static/')) {
+    $publicRoot = realpath(__DIR__ . '/src/public');
+    $relativePath = rawurldecode(substr($requestPath, strlen('/static/')));
+    $assetPath = $publicRoot && $relativePath !== ''
+        ? realpath($publicRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath))
+        : false;
+    if ($publicRoot && $assetPath && str_starts_with($assetPath, $publicRoot . DIRECTORY_SEPARATOR) && is_file($assetPath)) {
+        $contentTypes = [
+            'css' => 'text/css; charset=utf-8',
+            'js' => 'application/javascript; charset=utf-8',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'ico' => 'image/x-icon',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+        ];
+        $extension = strtolower(pathinfo($assetPath, PATHINFO_EXTENSION));
+        header('Content-Type: ' . ($contentTypes[$extension] ?? 'application/octet-stream'));
+        header('Cache-Control: public, max-age=86400');
+        header('Content-Length: ' . (string)filesize($assetPath));
+        readfile($assetPath);
+        exit;
+    }
+    http_response_code(404);
+    exit;
+}
+
 try {
     migrate_schema();
 } catch (Throwable $error) {
@@ -12,7 +43,7 @@ try {
 }
 
 check_csrf();
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$path = $requestPath;
 $path = '/' . trim($path, '/');
 $path = preg_replace('#^/index\.php(?=/|$)#', '', $path) ?: '/';
 if ($path !== '/') {
@@ -25,6 +56,15 @@ if (str_starts_with($path, '/api/')) {
 if (preg_match('#^/img/(\d+)$#', $path, $imageMatch)) {
     handle_image((int)$imageMatch[1]);
 }
+if (preg_match('#^/review-img/(\d+)$#', $path, $reviewImageMatch)) {
+    handle_review_image((int)$reviewImageMatch[1]);
+}
+if ($path === '/reviews' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    submit_review();
+}
+if (preg_match('#^/reviews/(\d+)$#', $path, $reviewMatch) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    update_review((int)$reviewMatch[1]);
+}
 if (str_starts_with($path, '/admin')) {
     handle_admin($path);
 }
@@ -35,11 +75,14 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php7' : '/static/css/shop.css?v=php11';
+    $css = $admin ? '/static/css/admin.css?v=php11' : '/static/css/shop.css?v=php20';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
     }
+    $adminNewOrderMarker = ($admin && $shell && admin_unchecked_order_count() > 0)
+        ? '<span class="admin-new-order-marker" hidden aria-label="확인하지 않은 신규 주문이 있습니다"></span>'
+        : '';
 
     if ($admin && !$shell) {
         echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . e($title) . ' · 깅모지 관리자</title><link rel="stylesheet" href="' . $css . '"></head><body>' . $body . '</body></html>';
@@ -47,11 +90,11 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     }
 
     if ($admin) {
-        echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . e($title) . ' · 깅모지 관리자</title><link rel="stylesheet" href="' . $css . '"></head><body><div class="shell"><aside class="side"><a class="logo" href="/admin">깅모지<small>ADMIN</small></a><nav class="nav"><a href="/admin">대시보드</a><a href="/admin/orders">주문 관리</a><a href="/admin/products">상품·재고</a><a href="/admin/settings">사이트 설정</a><a href="/admin/pages">약관·정책</a></nav><div class="side-foot"><a href="/" target="_blank">고객 화면 열기 ↗</a><form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><button class="btn sm ghost">로그아웃</button></form></div></aside><main class="main">';
+        echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . e($title) . ' · 깅모지 관리자</title><link rel="stylesheet" href="' . $css . '"></head><body><div class="shell"><aside class="side"><a class="logo" href="/admin">깅모지<small>ADMIN</small></a><nav class="nav"><a href="/admin">대시보드</a><a href="/admin/orders">주문 관리</a><a href="/admin/users">회원 관리</a><a href="/admin/reviews">리뷰 관리</a><a href="/admin/products">상품·재고</a><a href="/admin/settings">사이트 설정</a><a href="/admin/pages">약관·정책</a></nav><div class="side-foot"><a href="/" target="_blank">고객 화면 열기 ↗</a><form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><button class="btn sm ghost">로그아웃</button></form></div></aside><main class="main">';
         if ($flash) {
             echo '<div class="flash ' . ($flash[0] === 'error' ? 'error' : '') . '" role="status" aria-live="polite">' . e($flash[1]) . '</div>';
         }
-        echo $body . '</main></div><script src="/static/js/admin.js?v=php7"></script></body></html>';
+        echo $adminNewOrderMarker . $body . '</main></div><script src="/static/js/admin.js?v=php10"></script></body></html>';
         exit;
     }
 
@@ -72,8 +115,13 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     }
     echo $body;
     echo '<footer class="foot"><div class="wrap"><div class="brand">깅모지</div><nav class="foot-links"><a href="/page/terms">이용약관</a><a href="/page/privacy">개인정보처리방침</a><a href="/page/refund">교환·환불 정책</a></nav><div class="biz"><span>상호 ' . e($s['biz_name']) . '</span><span>대표자 ' . e($s['biz_owner']) . '</span><br><span>사업자등록번호 ' . e($s['biz_reg_no']) . '</span><br><span>주소 ' . e($s['biz_address']) . '</span><br><span>연락처 ' . e($s['biz_phone']) . '</span></div></div></footer>';
-    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php12"></script>' . $extra . '</body></html>';
+    echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php17"></script>' . $extra . '</body></html>';
     exit;
+}
+
+function admin_unchecked_order_count(): int
+{
+    return (int)db()->query("SELECT COUNT(*) FROM orders WHERE admin_checked_at IS NULL AND status <> 'cancelled'")->fetchColumn();
 }
 
 function shop_body(string $content, bool $withCart = false): string
@@ -108,6 +156,7 @@ function handle_shop(string $path): never
             }
             $body .= '</div>';
         }
+        $body .= render_reviews_section(recent_reviews());
         $body .= '</main>';
         page('', shop_body($body, true));
     }
@@ -122,16 +171,7 @@ function handle_shop(string $path): never
         $gallery = '';
         $imageSplit = product_image_split($product);
         $mainImage = $imageSplit['main'];
-        $detailGalleryImages = [];
-        $seenGalleryHashes = [];
-        if ($mainImage) $seenGalleryHashes[(string)($mainImage['image_hash'] ?? '') ?: 'id:' . (int)$mainImage['id']] = true;
-        foreach ($imageSplit['details'] as $image) {
-            $hash = (string)($image['image_hash'] ?? '');
-            $key = $hash !== '' ? $hash : 'id:' . (int)$image['id'];
-            if (isset($seenGalleryHashes[$key])) continue;
-            $seenGalleryHashes[$key] = true;
-            $detailGalleryImages[] = $image;
-        }
+        $detailGalleryImages = $imageSplit['details'];
         $galleryImages = $mainImage ? [$mainImage] : [];
         if ($mainImage) {
             $gallery = '<div class="thumb"><img src="/img/' . (int)$mainImage['id'] . '" alt="' . e($product['name']) . '"></div>';
@@ -156,7 +196,7 @@ function handle_shop(string $path): never
         }
         $detailImages = '';
         foreach ($detailGalleryImages as $image) {
-            $detailImages .= '<img class="detail-image" src="/img/' . (int)$image['id'] . '" alt="' . e($product['name']) . ' 상세 이미지" loading="lazy">';
+            $detailImages .= '<img class="detail-image" src="/img/' . (int)$image['id'] . '" alt="' . e($product['name']) . ' 상세 이미지" loading="eager" decoding="async">';
         }
         $detailImages = $detailImages ? '<div class="detail-images" aria-label="상품 상세 이미지">' . $detailImages . '</div>' : '';
         $body = '<main class="detail-page"><div class="detail-breadcrumb"><a href="/">HOME</a><span>/</span><span>' . e($product['name']) . '</span></div><div class="detail-layout"><section class="detail-media"><div class="p-gallery detail-gallery">' . $gallery . '</div></section><section class="detail-info"><p class="detail-kicker">GINGMOJI COLLECTION</p><h1 class="p-name">' . e($product['name']) . '</h1><div class="' . ($showPrice ? 'p-price' : 'price hidden') . '">' . ($showPrice ? won($product['price']) : '가격은 방송 중 공개됩니다') . '</div><div class="p-meta">';
@@ -427,6 +467,253 @@ function handle_image(int $id): never
     exit;
 }
 
+function handle_review_image(int $id): never
+{
+    $stmt = db()->prepare('SELECT mime, data FROM product_review_images WHERE id = ?');
+    $stmt->execute([$id]);
+    $image = $stmt->fetch();
+    if (!$image) {
+        http_response_code(404);
+        exit;
+    }
+    header('Content-Type: ' . $image['mime']);
+    header('Cache-Control: public, max-age=604800');
+    echo $image['data'];
+    exit;
+}
+
+function review_is_eligible(string $status): bool
+{
+    return in_array($status, ['paid', 'kept', 'preparing', 'shipped'], true);
+}
+
+function review_text_length(string $value): int
+{
+    return function_exists('mb_strlen') ? mb_strlen($value, 'UTF-8') : strlen($value);
+}
+
+function review_author_label(string $name): string
+{
+    $name = trim($name);
+    if ($name === '') return '구매 고객';
+    return (function_exists('mb_substr') ? mb_substr($name, 0, 1, 'UTF-8') : substr($name, 0, 1)) . '**';
+}
+
+function uploaded_review_images(): array
+{
+    $files = $_FILES['photos'] ?? null;
+    if (!$files || !is_array($files['name'] ?? null)) return [];
+    $names = $files['name'];
+    if (count($names) > 3) throw new RuntimeException('사진은 최대 3장까지 올릴 수 있어요.');
+    $allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    $images = [];
+    foreach (array_keys($names) as $index) {
+        $error = (int)($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
+        if ($error === UPLOAD_ERR_NO_FILE) continue;
+        if ($error !== UPLOAD_ERR_OK) throw new RuntimeException('사진 업로드에 실패했어요.');
+        $tmp = (string)($files['tmp_name'][$index] ?? '');
+        $size = (int)($files['size'][$index] ?? 0);
+        if (!is_uploaded_file($tmp) || $size < 1 || $size > 5 * 1024 * 1024) {
+            throw new RuntimeException('사진은 장당 5MB 이하로 올려 주세요.');
+        }
+        $info = @getimagesize($tmp);
+        $mime = (string)($info['mime'] ?? '');
+        if (!$info || !in_array($mime, $allowed, true)) {
+            throw new RuntimeException('JPG, PNG, WEBP, GIF 사진만 올릴 수 있어요.');
+        }
+        $data = file_get_contents($tmp);
+        if ($data === false || $data === '') throw new RuntimeException('사진을 읽을 수 없어요.');
+        $images[] = ['mime' => $mime, 'data' => $data];
+    }
+    return $images;
+}
+
+function recent_reviews(): array
+{
+    $stmt = db()->query('SELECT r.id,r.product_id,r.rating,r.content,r.created_at,p.name AS product_name,u.name AS reviewer_name FROM product_reviews r JOIN products p ON p.id=r.product_id JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC,r.id DESC LIMIT 30');
+    $reviews = $stmt->fetchAll();
+    if (!$reviews) return [];
+
+    $marks = implode(',', array_fill(0, count($reviews), '?'));
+    $ids = array_map(static fn(array $review): int => (int)$review['id'], $reviews);
+    $imageStmt = db()->prepare('SELECT id,review_id FROM product_review_images WHERE review_id IN (' . $marks . ') ORDER BY review_id,sort_order,id');
+    $imageStmt->execute($ids);
+    $imagesByReview = [];
+    foreach ($imageStmt->fetchAll() as $image) $imagesByReview[(int)$image['review_id']][] = $image;
+    foreach ($reviews as &$review) $review['images'] = $imagesByReview[(int)$review['id']] ?? [];
+    unset($review);
+    return $reviews;
+}
+
+function review_stars(int $rating): string
+{
+    $rating = max(1, min(5, $rating));
+    return '<span class="review-stars" aria-label="5점 만점 중 ' . $rating . '점">' . str_repeat('★', $rating) . str_repeat('☆', 5 - $rating) . '</span>';
+}
+
+function review_write_targets(): array
+{
+    $user = current_user();
+    if (!$user) return [];
+    $stmt = db()->prepare("SELECT o.id AS order_id,o.order_no,o.status,oi.product_id,oi.product_name,MIN(oi.id) AS item_id FROM orders o JOIN order_items oi ON oi.order_id=o.id LEFT JOIN product_reviews r ON r.order_id=o.id AND r.product_id=oi.product_id WHERE o.user_id=? AND o.status IN ('paid','kept','preparing','shipped') AND r.id IS NULL GROUP BY o.id,o.order_no,o.status,oi.product_id,oi.product_name ORDER BY o.id DESC,item_id LIMIT 12");
+    $stmt->execute([$user['id']]);
+    return $stmt->fetchAll();
+}
+
+function render_review_photos(array $images, string $altPrefix): string
+{
+    if (!$images) return '';
+    $count = min(3, count($images));
+    $html = '<div class="review-photos review-photos-' . $count . '" aria-label="후기 사진">';
+    foreach ($images as $index => $image) {
+        $html .= '<a href="/review-img/' . (int)$image['id'] . '" target="_blank" rel="noreferrer"><img src="/review-img/' . (int)$image['id'] . '" alt="' . e($altPrefix . ' 후기 사진 ' . ($index + 1)) . '" width="640" height="480" loading="lazy"></a>';
+    }
+    return $html . '</div>';
+}
+
+function render_reviews_section(array $reviews): string
+{
+    return render_reviews_section_modal($reviews);
+    $entries = '';
+    foreach ($reviews as $review) {
+        $rating = (int)$review['rating'];
+        $entries .= '<article class="review-entry"><div class="review-entry-head"><div>' . review_stars($rating) . '<span class="review-rating">' . $rating . '.0</span></div><time datetime="' . e((string)$review['created_at']) . '">' . e(dt($review['created_at'])) . '</time></div><div class="review-author"><span>' . e(review_author_label((string)$review['reviewer_name'])) . '</span><span class="review-verified">구매 인증</span></div><p class="review-content">' . nl2br(e($review['content'])) . '</p>' . render_review_photos((array)$review['images'], (string)$review['product_name']) . '<div class="review-purchase"><span class="review-purchase-label">구매한 품목</span><span class="review-item-chip">' . e($review['product_name']) . '</span></div></article>';
+    }
+    if ($entries === '') $entries = '<p class="review-empty">첫 리뷰를 기다리고 있어요.</p>';
+    $writeTargets = review_write_targets();
+    $writeCards = '';
+    foreach ($writeTargets as $target) {
+        $ratingOptions = '<option value="">별점을 선택해 주세요</option>';
+        for ($rating = 5; $rating >= 1; $rating--) $ratingOptions .= '<option value="' . $rating . '">' . str_repeat('★', $rating) . ' ' . $rating . '점</option>';
+        $writeCards .= '<article class="review-write-card"><div class="review-write-card-head"><div><span class="review-write-kicker">구매 인증</span><h3>' . e($target['product_name']) . '</h3><p>주문 ' . e($target['order_no']) . '</p></div></div><form class="review-form" method="post" action="/reviews" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="order_id" value="' . (int)$target['order_id'] . '"><input type="hidden" name="product_id" value="' . (int)$target['product_id'] . '"><fieldset><label class="field"><span>별점</span><select name="rating" required>' . $ratingOptions . '</select></label><label class="field"><span>후기</span><textarea name="content" minlength="5" maxlength="1000" required placeholder="상품을 받아본 느낌을 적어 주세요."></textarea></label><label class="field"><span>사진 <small>(선택, 최대 3장 · 장당 5MB)</small></span><input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp,image/gif" multiple data-review-photo-input><small class="field-help">사진을 최대 3장까지 선택할 수 있어요.</small><div class="review-photo-preview" data-review-photo-preview hidden aria-live="polite"></div></label><button class="btn pink small" type="submit">리뷰 등록</button></fieldset></form></article>';
+    }
+    $writeBlock = $writeCards ? '<div class="review-write-panel"><div class="review-write-panel-head"><div><strong>구매한 상품에 리뷰를 남겨 주세요</strong><p>입금 완료된 주문의 상품마다 한 번씩 작성할 수 있어요.</p></div><span class="review-write-count">작성 가능 ' . count($writeTargets) . '개</span></div><div class="review-write-list">' . $writeCards . '</div></div>' : '';
+    $viewer = current_user();
+    if (!$viewer && !$writeBlock) $writeBlock = '<p class="review-login-prompt"><a class="link" href="/login">로그인</a>하면 구매한 상품의 후기를 남길 수 있어요.</p>';
+    return '<section class="review-section" aria-labelledby="review-title"><div class="review-section-head"><div><h2 id="review-title">구매 고객 리뷰</h2><p>고객이 구매한 상품과 사진, 후기를 한눈에 볼 수 있어요.</p></div><div class="review-section-tools"><span class="review-count">' . count($reviews) . '개</span></div></div>' . $writeBlock . '<div class="review-feed">' . $entries . '</div></section>';
+}
+
+function render_reviews_section_modal(array $reviews): string
+{
+    $entries = '';
+    foreach ($reviews as $review) {
+        $rating = (int)$review['rating'];
+        $entries .= '<article class="review-entry"><div class="review-entry-head"><div>' . review_stars($rating) . '<span class="review-rating">' . $rating . '.0</span></div><time datetime="' . e((string)$review['created_at']) . '">' . e(dt($review['created_at'])) . '</time></div><div class="review-author"><span>' . e(review_author_label((string)$review['reviewer_name'])) . '</span><span class="review-verified">구매 인증</span></div><p class="review-content">' . nl2br(e($review['content'])) . '</p>' . render_review_photos((array)$review['images'], (string)$review['product_name']) . '<div class="review-purchase"><span class="review-purchase-label">구매한 품목</span><span class="review-item-chip">' . e($review['product_name']) . '</span></div></article>';
+    }
+    if ($entries === '') $entries = '<p class="review-empty">첫 리뷰를 기다리고 있어요.</p>';
+
+    $writeTargets = review_write_targets();
+    $writeCards = '';
+    $reviewSheets = '';
+    foreach ($writeTargets as $target) {
+        $modalId = 'reviewModal' . (int)$target['order_id'] . '_' . (int)$target['product_id'];
+        $titleId = $modalId . 'Title';
+        $fileId = $modalId . 'Photos';
+        $ratingOptions = '<option value="">별점을 선택해 주세요</option>';
+        for ($rating = 5; $rating >= 1; $rating--) $ratingOptions .= '<option value="' . $rating . '">' . str_repeat('★', $rating) . ' ' . $rating . '점</option>';
+
+        $writeCards .= '<article class="review-write-card"><div class="review-write-card-head"><div><span class="review-write-kicker">구매 인증</span><h3>' . e($target['product_name']) . '</h3><p>주문 ' . e($target['order_no']) . '</p></div><button class="btn pink small" type="button" data-open-review-sheet="' . e($modalId) . '" aria-haspopup="dialog" aria-controls="' . e($modalId) . '">리뷰 작성</button></div></article>';
+
+        $reviewSheets .= '<section class="sheet review-modal" id="' . e($modalId) . '" data-review-sheet hidden role="dialog" aria-modal="true" aria-labelledby="' . e($titleId) . '"><div class="sheet-grab" aria-hidden="true"></div><div class="sheet-head"><h2 id="' . e($titleId) . '">리뷰 작성</h2><button type="button" class="sheet-close" data-close-sheet aria-label="리뷰 작성 닫기">×</button></div><div class="sheet-body"><div class="review-modal-product"><span class="review-write-kicker">구매 인증</span><strong>' . e($target['product_name']) . '</strong><small>주문 ' . e($target['order_no']) . '</small></div><form class="review-form review-modal-form" method="post" action="/reviews" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="order_id" value="' . (int)$target['order_id'] . '"><input type="hidden" name="product_id" value="' . (int)$target['product_id'] . '"><fieldset><legend class="sr-only">' . e($target['product_name']) . ' 리뷰 입력</legend><label class="field"><span>별점</span><select name="rating" required>' . $ratingOptions . '</select></label><label class="field"><span>후기</span><textarea name="content" minlength="5" maxlength="1000" required placeholder="상품을 받아본 느낌을 적어 주세요."></textarea></label><div class="field review-file-field" data-review-photo-field><span>사진 <small>(선택, 최대 3장 · 장당 5MB)</small></span><div class="review-file-picker"><label class="review-file-button" for="' . e($fileId) . '"><span class="review-file-button-icon" aria-hidden="true">＋</span><span><strong>사진 추가</strong><small>후기에 사진을 함께 올려 보세요</small></span></label><input class="review-file-input" id="' . e($fileId) . '" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp,image/gif" multiple data-review-photo-input><span class="review-file-name" data-review-file-name>선택된 사진 없음</span></div><small class="field-help">JPG, PNG, WEBP, GIF · 사진마다 5MB 이하</small><div class="review-photo-preview" data-review-photo-preview hidden aria-live="polite"></div></div><button class="btn pink block" type="submit">리뷰 등록</button></fieldset></form></div></section>';
+    }
+
+    $writeBlock = $writeCards ? '<div class="review-write-panel"><div class="review-write-panel-head"><div><strong>구매한 상품에 리뷰를 남겨 주세요</strong><p>입금 완료된 주문의 상품마다 한 번씩 작성할 수 있어요.</p></div><span class="review-write-count">작성 가능 ' . count($writeTargets) . '개</span></div><div class="review-write-list">' . $writeCards . '</div></div>' . $reviewSheets : '';
+    $viewer = current_user();
+    if (!$viewer && !$writeBlock) $writeBlock = '<p class="review-login-prompt"><a class="link" href="/login">로그인</a>하면 구매한 상품의 후기를 남길 수 있어요.</p>';
+    return '<section class="review-section" aria-labelledby="review-title"><div class="review-section-head"><div><h2 id="review-title">구매 고객 리뷰</h2><p>고객이 구매한 상품과 사진, 후기를 한눈에 볼 수 있어요.</p></div><div class="review-section-tools"><span class="review-count">' . count($reviews) . '개</span></div></div>' . $writeBlock . '<div class="review-feed">' . $entries . '</div></section>';
+}
+
+function submit_review(): never
+{
+    $user = require_user();
+    $orderId = (int)post_value('order_id');
+    $productId = (int)post_value('product_id');
+    $rating = (int)post_value('rating');
+    $content = trim((string)post_value('content'));
+    $orderStmt = db()->prepare('SELECT id,order_no,status FROM orders WHERE id=? AND user_id=?');
+    $orderStmt->execute([$orderId, $user['id']]);
+    $order = $orderStmt->fetch();
+    $back = $order ? '/orders/' . rawurlencode((string)$order['order_no']) : '/my/orders';
+    if (!$order || !review_is_eligible((string)$order['status'])) {
+        flash('error', '결제가 완료된 주문만 리뷰를 작성할 수 있어요.');
+        redirect_to($back);
+    }
+    if ($productId < 1 || $rating < 1 || $rating > 5 || $content === '' || review_text_length($content) < 5 || review_text_length($content) > 1000) {
+        flash('error', '별점과 5~1,000자 후기를 입력해 주세요.');
+        redirect_to($back);
+    }
+    $itemStmt = db()->prepare('SELECT product_name FROM order_items WHERE order_id=? AND product_id=? LIMIT 1');
+    $itemStmt->execute([$orderId, $productId]);
+    $item = $itemStmt->fetch();
+    if (!$item) {
+        flash('error', '구매한 상품만 리뷰를 작성할 수 있어요.');
+        redirect_to($back);
+    }
+    $existingStmt = db()->prepare('SELECT id FROM product_reviews WHERE order_id=? AND product_id=? LIMIT 1');
+    $existingStmt->execute([$orderId, $productId]);
+    if ($existingStmt->fetch()) {
+        flash('error', '이 주문의 상품 리뷰는 이미 작성했어요.');
+        redirect_to($back);
+    }
+    try {
+        $images = uploaded_review_images();
+        $pdo = db();
+        $pdo->beginTransaction();
+        $pdo->prepare('INSERT INTO product_reviews (user_id,order_id,product_id,rating,content) VALUES (?,?,?,?,?)')->execute([$user['id'], $orderId, $productId, $rating, $content]);
+        $reviewId = (int)$pdo->lastInsertId();
+        $imageStmt = $pdo->prepare('INSERT INTO product_review_images (review_id,mime,data,sort_order) VALUES (?,?,?,?)');
+        foreach ($images as $sort => $image) $imageStmt->execute([$reviewId, $image['mime'], $image['data'], $sort]);
+        $pdo->commit();
+        flash('ok', '상품 후기를 남겼어요.');
+    } catch (Throwable $error) {
+        if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
+        $duplicate = $error instanceof PDOException && $error->getCode() === '23000';
+        flash('error', $duplicate ? '이 주문의 상품 리뷰는 이미 작성했어요.' : ($error->getMessage() ?: '리뷰를 저장하지 못했어요.'));
+    }
+    redirect_to($back);
+}
+
+function update_review(int $reviewId): never
+{
+    $user = require_user();
+    $stmt = db()->prepare('SELECT r.*,o.order_no,p.name AS product_name FROM product_reviews r JOIN orders o ON o.id=r.order_id JOIN products p ON p.id=r.product_id WHERE r.id=? AND r.user_id=?');
+    $stmt->execute([$reviewId, $user['id']]);
+    $review = $stmt->fetch();
+    $back = '/my#my-reviews';
+    if (!$review) {
+        flash('error', '내가 작성한 리뷰만 수정하거나 삭제할 수 있어요.');
+        redirect_to($back);
+    }
+    if (post_value('action') === 'delete') {
+        db()->prepare('DELETE FROM product_reviews WHERE id=? AND user_id=?')->execute([$reviewId, $user['id']]);
+        flash('ok', '리뷰를 삭제했습니다.');
+        redirect_to($back);
+    }
+    $rating = (int)post_value('rating');
+    $content = trim((string)post_value('content'));
+    if ($rating < 1 || $rating > 5 || $content === '' || review_text_length($content) < 5 || review_text_length($content) > 1000) {
+        flash('error', '별점과 5~1,000자 후기를 입력해 주세요.');
+        redirect_to($back);
+    }
+    try {
+        $images = uploaded_review_images();
+        $pdo = db();
+        $pdo->beginTransaction();
+        $pdo->prepare('UPDATE product_reviews SET rating=?,content=? WHERE id=? AND user_id=?')->execute([$rating, $content, $reviewId, $user['id']]);
+        if ($images) {
+            $pdo->prepare('DELETE FROM product_review_images WHERE review_id=?')->execute([$reviewId]);
+            $imageStmt = $pdo->prepare('INSERT INTO product_review_images (review_id,mime,data,sort_order) VALUES (?,?,?,?)');
+            foreach ($images as $sort => $image) $imageStmt->execute([$reviewId, $image['mime'], $image['data'], $sort]);
+        }
+        $pdo->commit();
+        flash('ok', '리뷰를 수정했습니다.');
+    } catch (Throwable $error) {
+        if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
+        flash('error', $error->getMessage() ?: '리뷰를 수정하지 못했어요.');
+    }
+    redirect_to($back);
+}
+
 function handle_api(string $path): never
 {
     if ($path === '/api/live') {
@@ -509,10 +796,18 @@ function cart_quote(array $input): array
     }
     $user = current_user();
     $delivery = ($input['deliveryType'] ?? 'direct') === 'keep' ? 'keep' : 'direct';
-    $includeKept = $delivery === 'direct' && !empty($input['includeKept']) && $user;
+    // 발송 대기 중인 결제완료 주문에 추가: 같은 택배로 나가므로 배송비를 다시 받지 않는다.
+    $mergeOrder = null;
+    $mergeOrderId = (int)($input['mergeOrderId'] ?? 0);
+    if ($delivery === 'direct' && $mergeOrderId > 0 && $user) {
+        foreach (mergeable_paid_orders((int)$user['id']) as $candidate) {
+            if ((int)$candidate['id'] === $mergeOrderId) { $mergeOrder = $candidate; break; }
+        }
+    }
+    $includeKept = $delivery === 'direct' && !$mergeOrder && !empty($input['includeKept']) && $user;
     $keptAmount = $includeKept ? active_kept_amount((int)$user['id']) : 0;
-    $shippingBase = $itemsAmount + $keptAmount;
-    $shipping = $delivery === 'keep' ? 0 : ($shippingBase >= (int)$settings['free_shipping_threshold'] ? 0 : (int)$settings['shipping_fee']);
+    $shippingBase = $itemsAmount + $keptAmount + ($mergeOrder ? (int)$mergeOrder['items_amount'] : 0);
+    $shipping = ($delivery === 'keep' || $mergeOrder) ? 0 : ($shippingBase >= (int)$settings['free_shipping_threshold'] ? 0 : (int)$settings['shipping_fee']);
     $pointUse = 0;
     $maxPoints = 0;
     if ($user) {
@@ -522,7 +817,7 @@ function cart_quote(array $input): array
         $pointUse = $maxPoints;
     }
     $total = max(0, $itemsAmount + $shipping - $pointUse);
-    return ['ok' => true, 'live' => (bool)$settings['live_on'], 'lines' => $lines, 'hasProblem' => $hasProblem, 'summary' => ['itemsAmount' => $itemsAmount, 'keptAmount' => $keptAmount, 'includeKept' => (bool)$includeKept, 'shippingBase' => $shippingBase, 'shippingFee' => $shipping, 'deliveryType' => $delivery, 'pointUsed' => $pointUse, 'total' => $total, 'maxPoints' => $maxPoints, 'remainingForFree' => max(0, (int)$settings['free_shipping_threshold'] - $shippingBase)]];
+    return ['ok' => true, 'live' => (bool)$settings['live_on'], 'lines' => $lines, 'hasProblem' => $hasProblem, 'summary' => ['itemsAmount' => $itemsAmount, 'keptAmount' => $keptAmount, 'includeKept' => (bool)$includeKept, 'shippingBase' => $shippingBase, 'shippingFee' => $shipping, 'deliveryType' => $delivery, 'pointUsed' => $pointUse, 'total' => $total, 'maxPoints' => $maxPoints, 'mergeOrder' => $mergeOrder ? ['id' => (int)$mergeOrder['id'], 'orderNo' => (string)$mergeOrder['order_no']] : null, 'remainingForFree' => $mergeOrder ? 0 : max(0, (int)$settings['free_shipping_threshold'] - $shippingBase)]];
 }
 
 function create_order(array $input): never
@@ -532,9 +827,17 @@ function create_order(array $input): never
     if (!$settings['live_on']) {
         json_out(['ok' => false, 'message' => '방송 중에만 주문할 수 있습니다.'], 400);
     }
+    $liveSessionStartedAt = active_live_session_start($settings);
     $payment = ($input['paymentMethod'] ?? '') === 'bank' ? 'bank' : '';
     if ($payment !== 'bank') {
         json_out(['ok' => false, 'message' => '현재 계좌이체 주문만 가능합니다.'], 400);
+    }
+    $depositorName = trim((string)($input['depositorName'] ?? ''));
+    if ($depositorName === '') {
+        json_out(['ok' => false, 'message' => '입금자명을 입력해 주세요.'], 400);
+    }
+    if (function_exists('mb_strlen') ? mb_strlen($depositorName, 'UTF-8') > 50 : strlen($depositorName) > 150) {
+        json_out(['ok' => false, 'message' => '입금자명은 50자 이내로 입력해 주세요.'], 400);
     }
     $recipient = (array)($input['recipient'] ?? []);
     $name = trim((string)($recipient['name'] ?? $user['name'] ?? ''));
@@ -547,6 +850,10 @@ function create_order(array $input): never
     if ($quote['hasProblem'] || !$quote['lines']) {
         json_out(['ok' => false, 'message' => '상품 재고를 다시 확인해 주세요.'], 400);
     }
+    $mergeTarget = $quote['summary']['mergeOrder'] ?? null;
+    if (!$mergeTarget && (int)($input['mergeOrderId'] ?? 0) > 0) {
+        json_out(['ok' => false, 'message' => '선택한 주문이 더 이상 발송 대기 상태가 아니에요. 배송비를 다시 확인해 주세요.'], 400);
+    }
     $receipt = (array)($input['cashReceipt'] ?? []);
     $receiptType = in_array(($receipt['type'] ?? 'none'), ['none', 'income', 'expense'], true) ? $receipt['type'] : 'none';
     $receiptValue = $receiptType === 'none' ? null : trim((string)($receipt['value'] ?? ''));
@@ -558,6 +865,21 @@ function create_order(array $input): never
     try {
         $pdo->beginTransaction();
         $orderNo = 'GM' . date('ymdHis') . random_int(10, 99);
+        $mergeOrderId = null;
+        $parent = null;
+        if ($mergeTarget) {
+            $parentStmt = $pdo->prepare('SELECT * FROM orders WHERE id=? AND user_id=? FOR UPDATE');
+            $parentStmt->execute([(int)$mergeTarget['id'], (int)$user['id']]);
+            $parent = $parentStmt->fetch();
+            if (!$parent || $parent['status'] !== 'paid' || $parent['delivery_type'] !== 'direct' || !empty($parent['merge_order_id'])) throw new RuntimeException('선택한 주문이 더 이상 발송 대기 상태가 아니에요. 배송비를 다시 확인해 주세요.');
+            $mergeOrderId = (int)$parent['id'];
+            // 같은 택배로 나가므로 받는 분 정보는 대표 주문을 따른다.
+            $name = (string)$parent['recipient_name'];
+            $phone = (string)$parent['recipient_phone'];
+            $address1 = (string)$parent['address1'];
+            $recipient['zipcode'] = (string)($parent['zipcode'] ?? '');
+            $recipient['address2'] = (string)($parent['address2'] ?? '');
+        }
         $delivery = $quote['summary']['deliveryType'];
         $includeKept = (bool)$quote['summary']['includeKept'];
         $keptAmount = (int)$quote['summary']['keptAmount'];
@@ -579,16 +901,18 @@ function create_order(array $input): never
             if (!$row || $row['is_soldout'] || (int)$row['stock'] < (int)$line['stockQty']) throw new RuntimeException('재고가 변경되어 주문을 다시 시도해 주세요.');
             $pdo->prepare('UPDATE products SET stock = stock - ? WHERE id = ?')->execute([$line['stockQty'], $line['productId']]);
         }
-        $stmt = $pdo->prepare('INSERT INTO orders (order_no,user_id,status,payment_method,delivery_type,keep_merge_requested,keep_merge_amount,items_amount,shipping_fee,point_used,total_amount,recipient_name,recipient_phone,zipcode,address1,address2,memo,depositor_name,cash_receipt_type,cash_receipt_value,cash_receipt_status,youtube_nickname,reserve_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-        $stmt->execute([$orderNo, $user['id'], 'pending', 'bank', $delivery, $includeKept ? 1 : 0, $keptAmount, $quote['summary']['itemsAmount'], $quote['summary']['shippingFee'], $pointUsed, $quote['summary']['total'], $name, $phone, (string)($recipient['zipcode'] ?? ''), $address1, trim((string)($recipient['address2'] ?? '')), trim((string)($recipient['memo'] ?? '')), trim((string)($input['depositorName'] ?? '')), $receiptType, $receiptValue, $receiptType === 'none' ? 'none' : 'requested', $user['youtube_nickname'] ?? '', $expires]);
+        $stmt = $pdo->prepare('INSERT INTO orders (order_no,user_id,live_session_started_at,status,payment_method,delivery_type,keep_merge_requested,keep_merge_amount,merge_order_id,items_amount,shipping_fee,point_used,total_amount,recipient_name,recipient_phone,zipcode,address1,address2,memo,depositor_name,cash_receipt_type,cash_receipt_value,cash_receipt_status,youtube_nickname,reserve_expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $stmt->execute([$orderNo, $user['id'], $liveSessionStartedAt, 'pending', 'bank', $delivery, $includeKept ? 1 : 0, $keptAmount, $mergeOrderId, $quote['summary']['itemsAmount'], $quote['summary']['shippingFee'], $pointUsed, $quote['summary']['total'], $name, $phone, (string)($recipient['zipcode'] ?? ''), $address1, trim((string)($recipient['address2'] ?? '')), trim((string)($recipient['memo'] ?? '')), $depositorName, $receiptType, $receiptValue, $receiptType === 'none' ? 'none' : 'requested', $user['youtube_nickname'] ?? '', $expires]);
         $orderId = (int)$pdo->lastInsertId();
         $itemStmt = $pdo->prepare('INSERT INTO order_items (order_id,product_id,product_name,package_type,unit_price,qty,stock_qty,qty_opened,qty_unopened,line_amount) VALUES (?,?,?,?,?,?,?,?,?,?)');
         foreach ($quote['lines'] as $line) {
             $itemStmt->execute([$orderId, $line['productId'], $line['name'], $line['packageType'], $line['unitPrice'], $line['qty'], $line['stockQty'], $line['opened'], $line['unopened'], $line['lineAmount']]);
         }
         $pdo->prepare('INSERT INTO payments (target_type,target_id,method,amount,status) VALUES (?,?,?,?,?)')->execute(['order', $orderId, 'bank', $quote['summary']['total'], 'ready']);
-        log_order_event($pdo, $orderId, 'created', null, 'pending', '주문 생성 · 입금 대기', 0, 'system', (int)$user['id']);
-        if (!empty($input['saveAddress'])) {
+        log_order_event($pdo, $orderId, 'created', null, 'pending', '주문 생성 · 입금 대기' . ($parent ? ' · 주문 ' . $parent['order_no'] . '에 추가 (합배송 · 배송비 없음)' : ''), 0, 'system', (int)$user['id']);
+        if ($parent) log_order_event($pdo, $mergeOrderId, 'merge_added', null, null, '추가 주문 ' . $orderNo . ' 연결 · 입금 확인 후 함께 발송', 0, 'system', (int)$user['id']);
+        // 합배송은 대표 주문의 과거 배송지를 따르므로 회원의 현재 기본 주소를 덮어쓰지 않는다.
+        if (!empty($input['saveAddress']) && !$parent) {
             $pdo->prepare('UPDATE users SET name=?,phone=?,zipcode=?,address1=?,address2=? WHERE id=?')->execute([$name, $phone, $recipient['zipcode'] ?? '', $address1, $recipient['address2'] ?? '', $user['id']]);
         }
         $pdo->commit();
@@ -653,9 +977,15 @@ function render_checkout(): never
     $pointGuide = e((string)$settings['point_guide_text']);
     $keptAmount = active_kept_amount((int)$user['id']);
     $keepMerge = $keptAmount > 0 ? '<div class="keep-merge" data-keep-merge hidden><label class="check"><input type="checkbox" name="includeKept" data-include-kept> 킵 보관 상품도 같이 배송받기 <span class="meta">(' . won($keptAmount) . ' 보관 중)</span></label><p class="hint">보관 중인 상품금액과 이번 주문을 합산해 8만 원 이상이면 배송비가 무료예요.</p></div>' : '';
-    $body = '<main class="wrap page"><div class="page-title"><h1>주문서</h1></div><div class="panel"><div data-co-lines></div><div class="summary"><div class="sum-row"><span>상품금액</span><span data-sum-items>-</span></div><div class="sum-row"><span>배송비</span><span data-sum-ship>-</span></div><div class="sum-row" data-sum-point-row hidden><span>포인트</span><span data-sum-point>-</span></div><div class="sum-row total"><span>결제금액</span><span data-sum-total>-</span></div></div><p class="hint" data-free-hint></p><form data-addr-form><h2>배송 정보</h2><label class="field"><span>받는 분</span><input name="name" value="' . e($user['name']) . '"></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '"></label><label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label><label class="field"><span>배송 메모</span><input name="memo"></label><label class="check"><input type="checkbox" name="saveAddress" checked> 다음에도 이 주소 사용</label><button type="button" class="btn sm" data-edit-addr hidden>주소 수정</button><h2>배송 방법</h2><div class="choices delivery-choices"><label class="choice"><input type="radio" name="delivery" value="direct" checked><span class="tile"><span class="t">바로배송</span><span class="d">8만 원 이상 무료 · 미만 4,000원</span></span></label><label class="choice"><input type="radio" name="delivery" value="keep"><span class="tile"><span class="t">킵(보관)</span><span class="d">배송비 없이 보관 · 나중에 함께 배송</span></span></label></div>' . $keepMerge . '<h2>결제 수단</h2><label class="check"><input type="radio" name="payment" value="bank" checked> 계좌이체</label><input name="depositorName" placeholder="입금자명"><div data-cash-receipt><h3>현금영수증</h3><label class="check"><input type="radio" name="cashReceiptType" value="none" checked> 신청 안 함</label><label class="check"><input type="radio" name="cashReceiptType" value="income"> 소득공제용</label><label class="check"><input type="radio" name="cashReceiptType" value="expense"> 지출증빙용</label><input name="cashReceiptValue" data-cash-receipt-value placeholder="휴대폰 번호 또는 사업자등록번호" hidden></div><h2>포인트</h2><p class="hint">' . $pointGuide . '</p><p class="hint">보유 포인트가 10,000P 이상이면 결제 시 10,000P 단위로 자동 사용됩니다.</p><p class="hint" data-point-hint></p><button type="button" class="btn big block pink" data-place-order>주문하기</button></form></div></main>';
+    $mergeOptions = '';
+    foreach (mergeable_paid_orders((int)$user['id']) as $index => $paidOrder) {
+        $attrs = ' data-merge-no="' . e($paidOrder['order_no']) . '" data-merge-name="' . e($paidOrder['recipient_name']) . '" data-merge-phone="' . e($paidOrder['recipient_phone']) . '" data-merge-zipcode="' . e($paidOrder['zipcode']) . '" data-merge-address1="' . e($paidOrder['address1']) . '" data-merge-address2="' . e($paidOrder['address2']) . '"';
+        $mergeOptions .= '<label class="check merge-option"><input type="radio" name="mergeOrderId" value="' . (int)$paidOrder['id'] . '"' . $attrs . ($index === 0 ? ' checked' : '') . '><span class="merge-option-body"><strong>' . e($paidOrder['order_no']) . ' <span class="meta">' . e(dt($paidOrder['paid_at'] ?: $paidOrder['created_at'])) . ' 결제</span></strong><small>' . e($paidOrder['item_names'] ?: '상품') . ' · ' . won($paidOrder['items_amount']) . '</small></span></label>';
+    }
+    $orderMerge = $mergeOptions !== '' ? '<div class="keep-merge order-merge-box" data-order-merge><p class="merge-title">발송 대기 중인 주문에 추가하기</p><p class="hint merge-hint">아직 발송 전인 주문과 한 택배로 보내드려요. 배송비가 다시 붙지 않고, 받는 분 정보는 그 주문과 같아요.</p>' . $mergeOptions . '<label class="check merge-option"><input type="radio" name="mergeOrderId" value="0"><span class="merge-option-body"><strong>따로 받기</strong><small>새 주문으로 배송비를 따로 계산해요</small></span></label></div>' : '';
+    $body = '<main class="wrap page"><div class="page-title"><h1>주문서</h1></div><div class="panel"><div data-co-lines></div><div class="summary"><div class="sum-row"><span>상품금액</span><span data-sum-items>-</span></div><div class="sum-row"><span>배송비</span><span data-sum-ship>-</span></div><div class="sum-row" data-sum-point-row hidden><span>포인트</span><span data-sum-point>-</span></div><div class="sum-row total"><span>결제금액</span><span data-sum-total>-</span></div></div><p class="hint" data-free-hint></p><form data-addr-form><h2>배송 정보</h2><p class="hint" data-merge-addr-hint hidden></p><label class="field"><span>받는 분</span><input name="name" value="' . e($user['name']) . '"></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '"></label><label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label><label class="field"><span>배송 메모</span><input name="memo"></label><label class="check"><input type="checkbox" name="saveAddress" checked> 다음에도 이 주소 사용</label><button type="button" class="btn sm" data-edit-addr hidden>주소 수정</button><h2>배송 방법</h2><div class="choices delivery-choices"><label class="choice"><input type="radio" name="delivery" value="direct" checked><span class="tile"><span class="t">바로배송</span><span class="d">8만 원 이상 무료 · 미만 4,000원</span></span></label><label class="choice"><input type="radio" name="delivery" value="keep"><span class="tile"><span class="t">킵(보관)</span><span class="d">배송비 없이 보관 · 나중에 함께 배송</span></span></label></div>' . $orderMerge . $keepMerge . '<h2>결제 수단</h2><label class="check"><input type="radio" name="payment" value="bank" checked> 계좌이체</label><label class="field payment-depositor"><span>입금자명 <em class="required-mark">필수</em></span><input name="depositorName" maxlength="50" autocomplete="name" required></label><div data-cash-receipt><h3>현금영수증</h3><label class="check"><input type="radio" name="cashReceiptType" value="none" checked> 신청 안 함</label><label class="check"><input type="radio" name="cashReceiptType" value="income"> 소득공제용</label><label class="check"><input type="radio" name="cashReceiptType" value="expense"> 지출증빙용</label><input name="cashReceiptValue" data-cash-receipt-value placeholder="휴대폰 번호 또는 사업자등록번호" hidden></div><h2>포인트</h2><p class="hint">' . $pointGuide . '</p><p class="hint">보유 포인트가 10,000P 이상이면 결제 시 10,000P 단위로 자동 사용됩니다.</p><p class="hint" data-point-hint></p><button type="button" class="btn big block pink" data-place-order>주문하기</button></form></div></main>';
     $body = str_replace('<label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label>', '<label class="field"><span>주소</span><div class="field-row address-search-row"><input class="grow" name="zipcode" data-signup-zipcode value="' . e($user['zipcode']) . '" placeholder="우편번호" readonly required><button type="button" class="btn small ghost" data-address-search>주소 검색</button></div><input name="address1" data-signup-address value="' . e($user['address1']) . '" placeholder="주소 검색으로 입력" readonly required><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소" autocomplete="street-address"></label>', $body);
-    page('주문서', $body, false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1', '/static/js/checkout.js?v=php5']);
+    page('주문서', $body, false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1', '/static/js/checkout.js?v=php7']);
 }
 
 function render_order(string $orderNo): never
@@ -670,15 +1000,45 @@ function render_order(string $orderNo): never
     }
     $items = db()->prepare('SELECT * FROM order_items WHERE order_id = ?');
     $items->execute([$order['id']]);
-    $rows = '';
-    foreach ($items as $item) {
-        $rows .= '<li>' . e($item['product_name']) . ($item['package_type'] === 'full' ? ' · 풀박' : ($item['package_type'] === 'loose' ? ' · 낱박' : '')) . ' × ' . (int)$item['qty'] . ' <span>' . won($item['line_amount']) . '</span></li>';
+    $itemRows = $items->fetchAll();
+    $reviewStmt = db()->prepare('SELECT r.*,p.name AS product_name FROM product_reviews r JOIN products p ON p.id=r.product_id WHERE r.order_id=? AND r.user_id=? ORDER BY r.id');
+    $reviewStmt->execute([$order['id'], $user['id']]);
+    $reviewsByProduct = [];
+    foreach ($reviewStmt->fetchAll() as $review) {
+        $imageStmt = db()->prepare('SELECT id FROM product_review_images WHERE review_id=? ORDER BY sort_order,id');
+        $imageStmt->execute([(int)$review['id']]);
+        $review['images'] = $imageStmt->fetchAll();
+        $reviewsByProduct[(int)$review['product_id']] = $review;
     }
+    $rows = '';
+    $reviewProducts = [];
+    foreach ($itemRows as $item) {
+        $rows .= '<li>' . e($item['product_name']) . ($item['package_type'] === 'full' ? ' · 풀박' : ($item['package_type'] === 'loose' ? ' · 낱박' : '')) . ' × ' . (int)$item['qty'] . ' <span>' . won($item['line_amount']) . '</span></li>';
+        $reviewProducts[(int)$item['product_id']] = ['id' => (int)$item['product_id'], 'name' => (string)$item['product_name']];
+    }
+    $reviewCards = '';
+    foreach ($reviewProducts as $productId => $product) {
+        $review = $reviewsByProduct[$productId] ?? null;
+        if ($review) {
+            $reviewCards .= '<article class="order-review-card review-written"><div class="order-review-title"><h3>' . e($product['name']) . '</h3><span class="review-verified">작성 완료</span></div><div>' . review_stars((int)$review['rating']) . '</div><p class="review-content">' . nl2br(e($review['content'])) . '</p>' . render_review_photos((array)$review['images'], $product['name']) . '</article>';
+        } elseif (review_is_eligible((string)$order['status'])) {
+            $reviewCards .= '<article class="order-review-card"><form class="review-form" method="post" action="/reviews" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="order_id" value="' . (int)$order['id'] . '"><input type="hidden" name="product_id" value="' . $productId . '"><fieldset><legend>' . e($product['name']) . ' 후기 남기기</legend><label class="field"><span>별점</span><select name="rating" required><option value="">별점을 선택해 주세요</option><option value="5">★★★★★ 아주 좋아요</option><option value="4">★★★★ 좋아요</option><option value="3">★★★ 괜찮아요</option><option value="2">★★ 아쉬워요</option><option value="1">★ 별로예요</option></select></label><label class="field"><span>후기</span><textarea name="content" minlength="5" maxlength="1000" required placeholder="상품을 받아본 느낌을 적어 주세요."></textarea></label><label class="field"><span>사진 <small>(선택, 최대 3장 · 장당 5MB)</small></span><input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp,image/gif" multiple data-review-photo-input><small class="field-help">사진을 최대 3장까지 선택할 수 있어요. 선택한 사진은 아래에서 미리 볼 수 있어요.</small><div class="review-photo-preview" data-review-photo-preview hidden aria-live="polite"></div></label><button class="btn pink small" type="submit">리뷰 등록</button></fieldset></form></article>';
+        } else {
+            $reviewCards .= '<article class="order-review-card review-locked"><h3>' . e($product['name']) . '</h3><p>결제가 완료된 뒤 상품 후기를 작성할 수 있어요.</p></article>';
+        }
+    }
+    $reviewBlock = '<section class="order-reviews" aria-labelledby="order-review-title"><h2 id="order-review-title">상품 후기</h2><p class="hint">구매한 상품마다 한 번씩 후기를 남길 수 있어요.</p><div class="order-review-list">' . $reviewCards . '</div></section>';
     $settings = setting_values();
     $receipt = $order['cash_receipt_type'] === 'none' ? '신청 안 함' : ($order['cash_receipt_type'] === 'income' ? '소득공제용' : '지출증빙용');
     $deliveryLabel = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
     $mergeNotice = !empty($order['keep_merge_requested']) ? '<br>킵 보관 상품 ' . won($order['keep_merge_amount']) . ' 같이 배송' : '';
-    $body = '<main class="wrap page"><div class="panel"><h1>주문 완료</h1><p>주문번호 <strong>' . e($order['order_no']) . '</strong></p><p>상태: ' . e(order_status_label($order)) . '<br>배송 방식: ' . e($deliveryLabel) . $mergeNotice . '</p><ul class="order-items">' . $rows . '</ul><div class="sum-row total"><span>결제금액</span><span>' . won($order['total_amount']) . '</span></div><div class="notice">입금 계좌: ' . e($settings['bank_name']) . ' ' . e($settings['bank_account']) . ' (' . e($settings['bank_holder']) . ')<br>입금자명: ' . e($order['depositor_name']) . '<br>현금영수증: ' . e($receipt) . '</div><a class="btn block" href="/my/orders">주문 내역 보기</a></div></main>';
+    foreach (merge_group_orders(db(), $order) as $member) {
+        if ((int)$member['id'] === (int)$order['id']) continue;
+        $mergeNotice .= empty($member['merge_order_id'])
+            ? '<br>주문 ' . e($member['order_no']) . '에 추가 · 함께 배송 (배송비 없음)'
+            : '<br>추가 주문 ' . e($member['order_no']) . ' · ' . e(order_status_label($member)) . ' · 함께 배송';
+    }
+    $body = '<main class="wrap page"><div class="panel"><h1>주문 완료</h1><p>주문번호 <strong>' . e($order['order_no']) . '</strong></p><p>상태: ' . e(order_status_label($order)) . '<br>배송 방식: ' . e($deliveryLabel) . $mergeNotice . '</p><ul class="order-items">' . $rows . '</ul>' . $reviewBlock . '<div class="sum-row total"><span>결제금액</span><span>' . won($order['total_amount']) . '</span></div><div class="notice">입금 계좌: ' . e($settings['bank_name']) . ' ' . e($settings['bank_account']) . ' (' . e($settings['bank_holder']) . ')<br>입금자명: ' . e($order['depositor_name']) . '<br>현금영수증: ' . e($receipt) . '</div><a class="btn block" href="/my/orders">주문 내역 보기</a></div></main>';
     page('주문 완료', $body);
 }
 
@@ -731,13 +1091,29 @@ function render_my(string $path): never
     $orderStmt->execute([$user['id']]);
     $orderRows = '';
     foreach ($orderStmt as $order) {
-        $deliveryLabel = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
+        $deliveryLabel = $order['delivery_type'] === 'keep' ? '킵(보관)' : (!empty($order['merge_order_id']) ? '바로배송 · 추가 주문' : '바로배송');
         $orderRows .= '<a class="item my-order-item" href="/orders/' . e($order['order_no']) . '"><div class="top-row"><strong>' . e($order['order_no']) . '</strong><span class="meta">' . e(dt($order['created_at'])) . '</span></div><div class="my-order-row"><span>' . e($deliveryLabel . ' · ' . order_status_label($order)) . '</span><b>' . won($order['total_amount']) . '</b></div></a>';
     }
 
+    $reviewStmt = db()->prepare('SELECT r.*,p.name AS product_name,o.order_no FROM product_reviews r JOIN products p ON p.id=r.product_id JOIN orders o ON o.id=r.order_id WHERE r.user_id=? ORDER BY r.created_at DESC,r.id DESC LIMIT 30');
+    $reviewStmt->execute([$user['id']]);
+    $reviewImageStmt = db()->prepare('SELECT id FROM product_review_images WHERE review_id=? ORDER BY sort_order,id');
+    $myReviewRows = '';
+    $myReviewData = $reviewStmt->fetchAll();
+    foreach ($myReviewData as $review) {
+        $reviewImageStmt->execute([(int)$review['id']]);
+        $reviewImages = $reviewImageStmt->fetchAll();
+        $ratingOptions = '';
+        for ($rating = 5; $rating >= 1; $rating--) $ratingOptions .= '<option value="' . $rating . '" ' . ((int)$review['rating'] === $rating ? 'selected' : '') . '>' . str_repeat('★', $rating) . ' ' . $rating . '점</option>';
+        $editForm = '<form class="review-edit-form" method="post" action="/reviews/' . (int)$review['id'] . '" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="update"><label class="field"><span>별점</span><select name="rating" required>' . $ratingOptions . '</select></label><label class="field"><span>후기</span><textarea name="content" minlength="5" maxlength="1000" required>' . e($review['content']) . '</textarea></label><label class="field"><span>사진 수정 <small>(선택 시 기존 사진을 교체)</small></span><input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp,image/gif" multiple data-review-photo-input><small class="field-help">최대 3장 · 장당 5MB</small><div class="review-photo-preview" data-review-photo-preview hidden aria-live="polite"></div></label><button class="btn pink small" type="submit">리뷰 수정</button></form>';
+        $deleteForm = '<form class="review-delete-form" method="post" action="/reviews/' . (int)$review['id'] . '" onsubmit="return confirm(\'이 리뷰를 삭제할까요?\');"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="delete"><button class="btn ghost small" type="submit">리뷰 삭제</button></form>';
+        $myReviewRows .= '<article class="my-review-card"><div class="my-review-head"><div><h3>' . e($review['product_name']) . '</h3><p>주문 ' . e($review['order_no']) . ' · ' . e(dt($review['created_at'])) . '</p></div>' . review_stars((int)$review['rating']) . '</div>' . render_review_photos($reviewImages, (string)$review['product_name']) . $editForm . $deleteForm . '</article>';
+    }
+    $myReviews = '<section class="panel my-section my-reviews" id="my-reviews"><div class="section-head"><div><h2>내가 남긴 리뷰</h2><p class="page-sub">작성한 상품 후기와 사진을 확인하고 수정할 수 있어요.</p></div><span class="review-count">' . num(count($myReviewData)) . '개</span></div>' . ($myReviewRows ?: '<p class="my-empty">아직 작성한 리뷰가 없어요. 주문 완료 후 상품 후기를 남겨 보세요.</p>') . '</section>';
+
     $profile = '<form method="post" class="profile-form"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="profile"><div class="profile-grid"><label class="field"><span>아이디</span><input value="' . e($user['login_id']) . '" readonly></label><label class="field"><span>성함</span><input name="name" value="' . e($user['name']) . '" required></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '" required></label><label class="field"><span>유튜브 닉네임</span><input name="youtube_nickname" value="' . e($user['youtube_nickname']) . '" required></label><label class="field"><span>새 비밀번호</span><input name="new_password" type="password" minlength="8" placeholder="변경할 때만 입력" autocomplete="new-password"></label></div><label class="field"><span>주소</span><div class="field-row address-search-row"><input class="grow" name="zipcode" data-signup-zipcode value="' . e($user['zipcode']) . '" placeholder="우편번호" readonly><button type="button" class="btn small ghost" data-address-search>주소 검색</button></div><input name="address1" data-signup-address value="' . e($user['address1']) . '" placeholder="주소 검색으로 입력" readonly><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소" autocomplete="street-address"></label><button class="btn big block pink">회원 정보 저장</button></form>';
     $keepSummary = $keptRows ? '<p class="hint">현재 <strong>' . won($keptAmount) . '</strong> 보관 중이에요. 상품을 더 담은 뒤 주문서에서 <strong>킵 상품 같이 배송받기</strong>를 선택할 수 있어요. 누적 ' . won($settings['free_shipping_threshold']) . ' 이상이면 배송비가 무료예요.</p>' : '<p class="my-empty">현재 보관 중인 킵 상품이 없어요.</p>';
-    $body = '<main class="wrap page"><div class="page-title"><h1>마이페이지</h1></div><section class="panel profile-panel"><div class="my-heading"><div><h2>' . e($user['name'] ?: $user['login_id']) . '님</h2><p class="hint">가입 정보를 확인하고 수정할 수 있어요.</p></div><div class="my-heading-actions"><a class="btn sm soft" href="/my/points">포인트 ' . num($user['point_balance']) . 'P</a><a class="btn sm" href="/logout">로그아웃</a></div></div>' . $profile . '</section><section class="panel my-section"><div class="section-head"><h2>킵 보관함</h2><a class="btn sm ghost" href="/">상품 더 담기</a></div>' . $keepSummary . '<div class="list">' . ($keptRows ?: '') . '</div></section><section class="panel my-section"><h2>최근 주문</h2><div class="list">' . ($orderRows ?: '<p class="my-empty">아직 주문 내역이 없어요.</p>') . '</div></section></main>';
+    $body = '<main class="wrap page"><div class="page-title"><h1>마이페이지</h1></div><section class="panel profile-panel"><div class="my-heading"><div><h2>' . e($user['name'] ?: $user['login_id']) . '님</h2><p class="hint">가입 정보를 확인하고 수정할 수 있어요.</p></div><div class="my-heading-actions"><a class="btn sm soft" href="/my/points">포인트 ' . num($user['point_balance']) . 'P</a><a class="btn sm" href="/logout">로그아웃</a></div></div>' . $profile . '</section><section class="panel my-section"><div class="section-head"><h2>킵 보관함</h2><a class="btn sm ghost" href="/">상품 더 담기</a></div>' . $keepSummary . '<div class="list">' . ($keptRows ?: '') . '</div></section>' . $myReviews . '<section class="panel my-section"><h2>최근 주문</h2><div class="list">' . ($orderRows ?: '<p class="my-empty">아직 주문 내역이 없어요.</p>') . '</div></section></main>';
     page('마이페이지', shop_body($body, true), false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1']);
 }
 
@@ -891,14 +1267,41 @@ function handle_admin(string $path): never
         redirect_to('/admin');
     }
 
+    if ($path === '/admin/users') {
+        admin_users();
+    }
+
+    if ($path === '/admin/reviews' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        admin_review_action();
+    }
+
+    if ($path === '/admin/reviews') {
+        admin_reviews();
+    }
+
+    if (preg_match('#^/admin/users/(\d+)/(points|memo)$#', $path, $match) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        admin_user_action((int)$match[1], (string)$match[2]);
+    }
+
+    if (preg_match('#^/admin/users/(\d+)$#', $path, $match)) {
+        admin_user_detail((int)$match[1]);
+    }
+
+    if ($path === '/admin/products/order' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        admin_product_order();
+    }
+
     if ($path === '/admin/products') {
         $products = product_rows(true);
         $rows = '';
-        foreach ($products as $product) {
-            $rows .= '<tr><td>' . e($product['name']) . '</td><td>' . num($product['price']) . '원</td><td>' . (int)$product['stock'] . '</td><td>' . ($product['is_visible'] ? '노출' : '숨김') . '</td><td><a class="btn sm" href="/admin/products/' . (int)$product['id'] . '">수정</a></td></tr>';
+        foreach ($products as $index => $product) {
+            $id = (int)$product['id'];
+            $up = '<form method="post" action="/admin/products/order"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="product_id" value="' . $id . '"><input type="hidden" name="direction" value="up"><button class="btn sm ghost order-move" type="submit" aria-label="' . e($product['name']) . ' 위로 이동"' . ($index === 0 ? ' disabled' : '') . '>↑</button></form>';
+            $down = '<form method="post" action="/admin/products/order"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="product_id" value="' . $id . '"><input type="hidden" name="direction" value="down"><button class="btn sm ghost order-move" type="submit" aria-label="' . e($product['name']) . ' 아래로 이동"' . ($index === count($products) - 1 ? ' disabled' : '') . '>↓</button></form>';
+            $rows .= '<tr><td>' . e($product['name']) . '</td><td>' . num($product['price']) . '원</td><td>' . (int)$product['stock'] . '</td><td>' . ($product['is_visible'] ? '노출' : '숨김') . '</td><td class="product-order-cell"><div class="product-order-actions">' . $up . $down . '</div></td><td><a class="btn sm" href="/admin/products/' . $id . '">수정</a></td></tr>';
         }
         $savedModal = isset($_GET['saved']) && $_GET['saved'] === '1' ? '<div class="admin-modal" data-admin-modal role="dialog" aria-modal="true" aria-labelledby="saved-title"><div class="admin-modal-card"><div class="admin-modal-icon">✓</div><h2 id="saved-title">저장되었습니다.</h2><p>상품·재고 목록으로 이동했습니다.</p><button type="button" class="btn pink" data-close-admin-modal>확인</button></div></div>' : '';
-        admin_shell('상품 관리', $savedModal . '<div class="page-head"><h1>상품·재고</h1><a class="btn pink" href="/admin/products/new">상품 등록</a></div><div class="table-wrap"><table><thead><tr><th>상품</th><th>가격</th><th>재고</th><th>노출</th><th></th></tr></thead><tbody>' . $rows . '</tbody></table></div>');
+        admin_shell('상품 관리', $savedModal . '<div class="page-head"><div><h1>상품·재고</h1><p class="page-sub">고객 화면에 보이는 순서는 위·아래 버튼으로 바꿀 수 있어요.</p></div><a class="btn pink" href="/admin/products/new">상품 등록</a></div><div class="table-wrap"><table><thead><tr><th>상품</th><th>가격</th><th>재고</th><th>노출</th><th>순서</th><th></th></tr></thead><tbody>' . $rows . '</tbody></table></div>');
     }
 
     if ($path === '/admin/products/new' || preg_match('#^/admin/products/(\d+)$#', $path, $match)) {
@@ -940,7 +1343,7 @@ function handle_admin(string $path): never
             $params[] = $to . ' 00:00:00';
         }
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
-        $stmt = db()->prepare("SELECT o.*, u.login_id, u.name AS user_name, u.youtube_nickname AS user_youtube_nickname, (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
+        $stmt = db()->prepare("SELECT o.*, u.login_id, u.name AS user_name, u.youtube_nickname AS user_youtube_nickname, (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names, (SELECT p.order_no FROM orders p WHERE p.id=o.merge_order_id) AS merge_parent_no, (SELECT COUNT(*) FROM orders c WHERE c.merge_order_id=o.id AND c.status<>'cancelled') AS merged_child_count FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
         $rows = '';
@@ -952,9 +1355,12 @@ function handle_admin(string $path): never
             $youtubeName = trim((string)($order['youtube_nickname'] ?: $order['user_youtube_nickname']));
             $depositorName = trim((string)$order['depositor_name']);
             $memberCell = '<strong>회원 · ' . e($memberName ?: '-') . '</strong><span class="table-sub">유튜브 · ' . e($youtubeName ?: '-') . '</span><span class="table-sub">입금자 · ' . e($depositorName ?: '-') . '</span><span class="table-sub">상품 · ' . e($order['item_names'] ?: '상품 정보 없음') . '</span>';
+            if (!empty($order['merge_parent_no'])) $memberCell .= '<span class="table-sub merge-sub">합배송 · ' . e($order['merge_parent_no']) . ' 주문에 추가 (배송비 없음)</span>';
+            if ((int)$order['merged_child_count'] > 0) $memberCell .= '<span class="table-sub merge-sub">추가 주문 ' . (int)$order['merged_child_count'] . '건 합배송</span>';
+            if (empty($order['admin_checked_at']) && $order['status'] !== 'cancelled') $memberCell = '<span class="order-new-indicator"><i class="new-order-dot" aria-hidden="true"></i>신규 주문</span>' . $memberCell;
             $actionCell = '';
             if ($order['status'] === 'pending' && $order['payment_method'] === 'bank') {
-                $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm ok" type="submit" name="action" value="confirm">입금 완료</button></form>';
+                $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm ok" type="submit" name="action" value="confirm">' . (!empty($order['merge_parent_no']) ? '추가 주문 입금 확인' : '입금 완료') . '</button></form>';
             } elseif ($order['status'] === 'cancelled') {
                 $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm danger" type="submit" name="action" value="delete" data-confirm-dialog="' . e($order['order_no']) . ' 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 삭제</button></form>';
             }
@@ -986,6 +1392,226 @@ function handle_admin(string $path): never
 
     http_response_code(404);
     admin_shell('관리자', '<div class="card"><h1>페이지를 찾을 수 없습니다.</h1></div>');
+}
+
+function admin_reviews(): never
+{
+    $stmt = db()->query('SELECT r.id,r.rating,r.content,r.created_at,p.name AS product_name,u.name AS user_name,u.login_id,o.id AS order_id,o.order_no FROM product_reviews r JOIN products p ON p.id=r.product_id JOIN users u ON u.id=r.user_id JOIN orders o ON o.id=r.order_id ORDER BY r.created_at DESC,r.id DESC');
+    $reviews = $stmt->fetchAll();
+    $imageStmt = db()->prepare('SELECT id FROM product_review_images WHERE review_id=? ORDER BY sort_order,id');
+    $rows = '';
+    foreach ($reviews as $review) {
+        $imageStmt->execute([(int)$review['id']]);
+        $photos = '';
+        foreach ($imageStmt->fetchAll() as $index => $image) {
+            $photos .= '<a href="/review-img/' . (int)$image['id'] . '" target="_blank" rel="noreferrer"><img src="/review-img/' . (int)$image['id'] . '" width="84" height="63" loading="lazy" alt="' . e($review['product_name'] . ' 리뷰 사진 ' . ($index + 1)) . '"></a>';
+        }
+        $photoHtml = $photos ? '<div class="admin-review-photos">' . $photos . '</div>' : '<span class="table-sub">사진 없음</span>';
+        $stars = '<span class="admin-review-stars" aria-label="5점 만점 중 ' . (int)$review['rating'] . '점">' . str_repeat('★', (int)$review['rating']) . str_repeat('☆', 5 - (int)$review['rating']) . '</span>';
+        $member = trim((string)($review['user_name'] ?: $review['login_id']));
+        $rows .= '<tr><td><span class="table-sub">' . e(dt($review['created_at'])) . '</span><span class="table-sub">리뷰 #' . (int)$review['id'] . '</span><a class="order-no" href="/admin/orders/' . (int)$review['order_id'] . '">주문 보기</a></td><td><strong class="admin-review-product">' . e($review['product_name']) . '</strong><span class="table-sub">주문 ' . e($review['order_no']) . '</span></td><td><strong>' . e($member ?: '-') . '</strong><span class="table-sub">' . e($review['login_id'] ?: '-') . '</span></td><td>' . $stars . '</td><td><div class="admin-review-content">' . nl2br(e($review['content'])) . '</div>' . $photoHtml . '</td><td><form method="post" action="/admin/reviews"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="review_id" value="' . (int)$review['id'] . '"><button class="btn sm danger" type="submit" name="action" value="delete" data-confirm-dialog="이 리뷰를 삭제할까요? 사진도 함께 삭제됩니다.">삭제</button></form></td></tr>';
+    }
+    if ($rows === '') $rows = '<tr><td colspan="6" class="empty-cell">아직 작성된 리뷰가 없습니다.</td></tr>';
+    $body = '<div class="page-head"><div><h1>리뷰 관리</h1><p class="page-sub">고객이 남긴 구매 상품·사진·후기를 확인하고 관리합니다.</p></div><span class="chip paid">총 ' . num(count($reviews)) . '개</span></div><div class="table-wrap"><table class="admin-review-table"><thead><tr><th>작성</th><th>구매 상품</th><th>회원</th><th>별점</th><th>후기·사진</th><th>관리</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
+    admin_shell('리뷰 관리', $body);
+}
+
+function admin_review_action(): never
+{
+    if (post_value('action') !== 'delete') redirect_to('/admin/reviews');
+    $id = (int)post_value('review_id');
+    if ($id > 0) {
+        db()->prepare('DELETE FROM product_reviews WHERE id=?')->execute([$id]);
+        flash('ok', '리뷰와 첨부 사진을 삭제했습니다.');
+    }
+    redirect_to('/admin/reviews');
+}
+
+function admin_users(): never
+{
+    $pdo = db();
+    $search = trim((string)($_GET['q'] ?? ''));
+    $where = '';
+    $params = [];
+    if ($search !== '') {
+        $where = 'WHERE u.login_id LIKE ? OR u.name LIKE ? OR u.phone LIKE ? OR u.youtube_nickname LIKE ? OR u.email LIKE ?';
+        $like = '%' . $search . '%';
+        $params = [$like, $like, $like, $like, $like];
+    }
+
+    $stmt = $pdo->prepare("SELECT u.*,
+        (SELECT COUNT(*) FROM orders o WHERE o.user_id=u.id AND o.status<>'cancelled') AS order_count,
+        (SELECT COALESCE(SUM(o.total_amount),0) FROM orders o WHERE o.user_id=u.id AND o.status<>'cancelled') AS order_total
+        FROM users u $where ORDER BY u.id DESC LIMIT 200");
+    $stmt->execute($params);
+    $users = $stmt->fetchAll();
+    $rows = '';
+    foreach ($users as $user) {
+        $id = (int)$user['id'];
+        $displayName = trim((string)($user['youtube_nickname'] ?: $user['name'] ?: $user['login_id']));
+        if ($displayName === '') $displayName = '회원 ' . $id;
+        $identity = trim((string)$user['name']);
+        $identityLine = $identity !== '' && $identity !== $displayName ? '이름 · ' . $identity : '회원번호 · ' . $id;
+        $login = trim((string)$user['login_id']);
+        $provider = $login !== '' ? '아이디 로그인' : (!empty($user['kakao_id']) ? '카카오 로그인' : (!empty($user['google_id']) ? '구글 로그인' : '소셜 계정'));
+        $phone = trim((string)$user['phone']);
+        $rows .= '<tr><td><a class="user-name" href="/admin/users/' . $id . '">' . e($displayName) . '</a><span class="table-sub">' . e($identityLine) . '</span></td><td><strong>' . e($phone !== '' ? $phone : '-') . '</strong><span class="table-sub">' . e($user['email'] ?: '-') . '</span></td><td><strong>' . e($provider) . '</strong><span class="table-sub">' . e($login !== '' ? $login : '가입 계정 확인') . '</span></td><td class="right"><strong class="point-balance num">' . num($user['point_balance']) . 'P</strong></td><td class="right"><strong class="num">' . num($user['order_count']) . '건</strong><span class="table-sub num">' . won($user['order_total']) . '</span></td><td><span class="table-sub">' . e(dt($user['created_at'])) . '</span><a class="btn sm ghost" href="/admin/users/' . $id . '">상세 보기</a></td></tr>';
+    }
+    if ($rows === '') $rows = '<tr><td colspan="6" class="empty-cell">' . ($search !== '' ? '검색 결과가 없습니다.' : '가입한 회원이 없습니다.') . '</td></tr>';
+
+    $filter = '<form class="card history-filters" method="get" action="/admin/users"><div class="filter-title"><div><h2>회원 원장</h2><p>포인트 잔액, 주문 합계와 가입 정보를 회원별로 확인합니다.</p></div><span class="chip paid">총 ' . num(count($users)) . '명</span></div><div class="filter-grid user-filter-grid"><label class="field"><span>회원 검색</span><input type="search" name="q" value="' . e($search) . '" placeholder="이름·아이디·휴대폰·유튜브 닉네임" autocomplete="off"></label><div class="filter-submit"><button class="btn pink" type="submit">검색</button><a class="btn ghost" href="/admin/users">초기화</a></div></div></form>';
+    $body = '<div class="page-head"><div><h1>회원 관리</h1><p class="page-sub">가입 회원의 구매·포인트·연락처 정보를 한 곳에서 확인해요.</p></div></div>' . $filter . '<div class="table-wrap"><table class="users-table"><thead><tr><th>회원</th><th>연락처</th><th>가입 계정</th><th class="right">포인트</th><th class="right">주문</th><th>가입일</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
+    admin_shell('회원 관리', $body);
+}
+
+function admin_user_detail(int $id): never
+{
+    $pdo = db();
+    $userStmt = $pdo->prepare('SELECT * FROM users WHERE id=?');
+    $userStmt->execute([$id]);
+    $user = $userStmt->fetch();
+    if (!$user) {
+        http_response_code(404);
+        admin_shell('회원 없음', '<div class="card"><h1>회원을 찾을 수 없습니다.</h1><p class="page-sub">삭제되었거나 잘못된 회원 번호입니다.</p><a class="btn ghost" href="/admin/users">회원 목록으로</a></div>');
+    }
+
+    $summaryStmt = $pdo->prepare("SELECT COUNT(*) AS order_count, COALESCE(SUM(total_amount),0) AS order_total, COALESCE(SUM(point_used),0) AS points_used, COALESCE(SUM(point_earned),0) AS points_earned FROM orders WHERE user_id=? AND status<>'cancelled'");
+    $summaryStmt->execute([$id]);
+    $summary = $summaryStmt->fetch() ?: ['order_count' => 0, 'order_total' => 0, 'points_used' => 0, 'points_earned' => 0];
+    $keptStmt = $pdo->prepare("SELECT COALESCE(SUM(items_amount),0) FROM orders WHERE user_id=? AND status='kept' AND shipment_request_id IS NULL");
+    $keptStmt->execute([$id]);
+    $keptAmount = (int)$keptStmt->fetchColumn();
+
+    $ordersStmt = $pdo->prepare("SELECT o.*, (SELECT GROUP_CONCAT(CONCAT(oi.product_name, ' × ', oi.qty) ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names FROM orders o WHERE o.user_id=? ORDER BY o.id DESC LIMIT 50");
+    $ordersStmt->execute([$id]);
+    $orders = $ordersStmt->fetchAll();
+    $orderRows = '';
+    foreach ($orders as $order) {
+        $paymentLabel = $order['payment_method'] === 'card' ? '카드결제' : '계좌이체';
+        $deliveryLabel = $order['delivery_type'] === 'keep' ? '킵 보관' : '바로배송';
+        $itemNames = trim((string)$order['item_names']);
+        if ($itemNames === '') $itemNames = '상품 정보 없음';
+        $pointMeta = [];
+        if ((int)$order['point_used'] > 0) $pointMeta[] = '포인트 사용 ' . num($order['point_used']) . 'P';
+        if ((int)$order['point_earned'] > 0) $pointMeta[] = '적립 예정 ' . num($order['point_earned']) . 'P';
+        $orderRows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a><span class="table-sub">' . e(dt($order['created_at'])) . '</span></td><td class="member-order-items"><strong>' . e($itemNames) . '</strong>' . ($pointMeta ? '<span class="table-sub">' . e(implode(' · ', $pointMeta)) . '</span>' : '') . '</td><td class="member-order-meta"><span class="table-sub">' . e($paymentLabel) . '</span><span class="table-sub">' . e($deliveryLabel) . '</span></td><td class="right"><strong class="num">' . won($order['total_amount']) . '</strong><span class="table-sub">상품 ' . won($order['items_amount']) . '</span></td><td><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span></td></tr>';
+    }
+    if ($orderRows === '') $orderRows = '<tr><td colspan="5" class="empty-cell">아직 주문한 상품이 없습니다.</td></tr>';
+
+    $ledgerStmt = $pdo->prepare('SELECT l.*, o.order_no FROM point_ledger l LEFT JOIN orders o ON o.id=l.order_id WHERE l.user_id=? ORDER BY l.id DESC LIMIT 100');
+    $ledgerStmt->execute([$id]);
+    $ledgerLabels = ['earn' => '주문 적립', 'adjust' => '적립 조정', 'use' => '주문 사용', 'revoke' => '적립 회수', 'refund' => '사용 취소', 'admin_add' => '관리자 지급', 'admin_sub' => '관리자 차감'];
+    $ledgerRows = '';
+    foreach ($ledgerStmt->fetchAll() as $ledger) {
+        $amount = (int)$ledger['amount'];
+        $amountLabel = ($amount > 0 ? '+' : '') . num($amount) . 'P';
+        $amountClass = $amount >= 0 ? 'point-positive' : 'point-negative';
+        $orderLink = !empty($ledger['order_id']) ? '<a href="/admin/orders/' . (int)$ledger['order_id'] . '">' . e($ledger['order_no'] ?: '주문 보기') . '</a>' : '-';
+        $ledgerRows .= '<tr><td><span class="table-sub">' . e(dt($ledger['created_at'])) . '</span></td><td><strong>' . e($ledgerLabels[$ledger['type']] ?? $ledger['type']) . '</strong><span class="table-sub">' . e($ledger['memo'] ?: '-') . '</span></td><td>' . $orderLink . '</td><td class="right ' . $amountClass . ' num">' . e($amountLabel) . '</td><td class="right num">' . num($ledger['balance_after']) . 'P</td></tr>';
+    }
+    if ($ledgerRows === '') $ledgerRows = '<tr><td colspan="5" class="empty-cell">포인트 변동 기록이 없습니다.</td></tr>';
+
+    $memberName = trim((string)($user['youtube_nickname'] ?: $user['name'] ?: $user['login_id']));
+    if ($memberName === '') $memberName = '회원 ' . $id;
+    $loginMethods = [];
+    if (trim((string)$user['login_id']) !== '') $loginMethods[] = '아이디 ' . trim((string)$user['login_id']);
+    if (!empty($user['kakao_id'])) $loginMethods[] = '카카오';
+    if (!empty($user['google_id'])) $loginMethods[] = '구글';
+    $address = implode(' ', array_filter([(string)$user['zipcode'], (string)$user['address1'], (string)$user['address2']], static fn($value): bool => trim($value) !== ''));
+    $body = '<div class="page-head"><div><a class="back-link" href="/admin/users">← 회원 목록</a><h1>' . e($memberName) . '</h1><p class="page-sub">회원번호 ' . $id . ' · 가입 ' . e(dt($user['created_at'])) . '</p></div><span class="chip paid">회원 상세</span></div>';
+    $body .= '<div class="stats member-summary"><div class="stat alert"><span class="k">현재 포인트</span><b class="v num">' . num($user['point_balance']) . 'P</b><span class="s">사용 가능한 잔액</span></div><div class="stat"><span class="k">유효 주문</span><b class="v num">' . num($summary['order_count']) . '건</b><span class="s">취소 주문 제외</span></div><div class="stat"><span class="k">주문 합계</span><b class="v num">' . won($summary['order_total']) . '</b><span class="s">결제 금액 합계</span></div><div class="stat soft"><span class="k">킵 보관</span><b class="v num">' . won($keptAmount) . '</b><span class="s">현재 보관 중인 상품</span></div></div>';
+    $body .= '<div class="two"><section class="card"><h2>회원 정보</h2><dl class="kv"><dt>이름</dt><dd>' . e($user['name'] ?: '-') . '</dd><dt>유튜브 닉네임</dt><dd>' . e($user['youtube_nickname'] ?: '-') . '</dd><dt>휴대폰</dt><dd>' . e($user['phone'] ?: '-') . '</dd><dt>주소</dt><dd>' . e($address ?: '-') . '</dd><dt>가입 계정</dt><dd>' . e($loginMethods ? implode(' · ', $loginMethods) : '-') . '</dd><dt>이메일</dt><dd>' . e($user['email'] ?: '-') . '</dd></dl></section><section class="card"><h2>관리자 메모</h2><form method="post" action="/admin/users/' . $id . '/memo"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><label class="field"><span>회원 응대·배송 참고 메모</span><textarea name="admin_memo" maxlength="2000" placeholder="관리자만 볼 수 있는 메모를 남겨 보세요." autocomplete="off">' . e($user['admin_memo']) . '</textarea></label><button class="btn pink" type="submit">메모 저장</button></form></section></div>';
+    $body .= '<section class="card"><div class="member-section-head"><div><h2>최근 주문</h2><p class="page-sub">최대 50건 · 취소 주문도 함께 표시합니다.</p></div><a class="btn sm ghost" href="/admin/orders?q=' . e(rawurlencode((string)($user['login_id'] ?: $user['name']))) . '">전체 주문에서 보기</a></div><div class="table-wrap"><table class="member-order-table"><thead><tr><th>주문번호</th><th>주문 상품</th><th>결제·배송</th><th class="right">결제 금액</th><th>상태</th></tr></thead><tbody>' . $orderRows . '</tbody></table></div></section>';
+    $body .= '<div class="two"><section class="card"><h2>포인트 조정</h2><p class="action-help">현재 잔액 <strong class="num">' . num($user['point_balance']) . 'P</strong>에 즉시 반영되고 변동 원장에 남습니다.</p><form method="post" action="/admin/users/' . $id . '/points" class="form-grid"><label class="field"><span>구분</span><select name="mode"><option value="add">지급</option><option value="sub">차감</option></select></label><label class="field"><span>포인트</span><input type="number" name="amount" min="1" max="1000000000" step="1" inputmode="numeric" required></label><label class="field full"><span>사유</span><input name="memo" maxlength="200" placeholder="예: 이벤트 보상, CS 보정" autocomplete="off"></label><div class="full"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><button class="btn pink" type="submit">포인트 적용</button></div></form></section><section class="card"><h2>포인트 요약</h2><dl class="kv"><dt>현재 잔액</dt><dd class="point-balance num">' . num($user['point_balance']) . 'P</dd><dt>주문 적립</dt><dd class="num">' . num($summary['points_earned']) . 'P</dd><dt>주문 사용</dt><dd class="num">' . num($summary['points_used']) . 'P</dd><dt>가입일</dt><dd>' . e(dt($user['created_at'])) . '</dd></dl></section></div>';
+    $body .= '<section class="card"><h2>포인트 변동 원장</h2><div class="table-wrap"><table><thead><tr><th>일시</th><th>구분·사유</th><th>연결 주문</th><th class="right">변동</th><th class="right">변동 후 잔액</th></tr></thead><tbody>' . $ledgerRows . '</tbody></table></div></section>';
+    admin_shell($memberName . ' · 회원 정보', $body);
+}
+
+function admin_user_action(int $id, string $action): never
+{
+    $pdo = db();
+    $userStmt = $pdo->prepare('SELECT id FROM users WHERE id=?');
+    $userStmt->execute([$id]);
+    if (!$userStmt->fetchColumn()) {
+        http_response_code(404);
+        admin_shell('회원 없음', '<div class="card"><h1>회원을 찾을 수 없습니다.</h1><a class="btn ghost" href="/admin/users">회원 목록으로</a></div>');
+    }
+
+    if ($action === 'memo') {
+        $memo = trim((string)post_value('admin_memo'));
+        if (function_exists('mb_substr')) $memo = mb_substr($memo, 0, 2000);
+        else $memo = substr($memo, 0, 2000);
+        $pdo->prepare('UPDATE users SET admin_memo=? WHERE id=?')->execute([$memo, $id]);
+        flash('ok', '관리자 메모를 저장했습니다.');
+        redirect_to('/admin/users/' . $id);
+    }
+
+    $amountText = trim((string)post_value('amount'));
+    if (!preg_match('/^\d+$/', $amountText) || strlen($amountText) > 10 || (int)$amountText < 1) {
+        flash('error', '포인트는 1P 이상 숫자로 입력해 주세요.');
+        redirect_to('/admin/users/' . $id);
+    }
+    $amount = (int)$amountText;
+    $isSub = post_value('mode') === 'sub';
+    $delta = $isSub ? -$amount : $amount;
+    $type = $isSub ? 'admin_sub' : 'admin_add';
+    $memo = trim((string)post_value('memo'));
+    if (function_exists('mb_substr')) $memo = mb_substr($memo, 0, 200);
+    else $memo = substr($memo, 0, 200);
+    if ($memo === '') $memo = $isSub ? '관리자 포인트 차감' : '관리자 포인트 지급';
+
+    try {
+        $pdo->beginTransaction();
+        $balanceStmt = $pdo->prepare('SELECT point_balance FROM users WHERE id=? FOR UPDATE');
+        $balanceStmt->execute([$id]);
+        $before = (int)$balanceStmt->fetchColumn();
+        $after = $before + $delta;
+        if ($after < 0) throw new RuntimeException('현재 잔액보다 많이 차감할 수 없습니다.');
+        $pdo->prepare('UPDATE users SET point_balance=? WHERE id=?')->execute([$after, $id]);
+        $pdo->prepare('INSERT INTO point_ledger (user_id,type,amount,balance_after,memo) VALUES (?,?,?,?,?)')->execute([$id, $type, $delta, $after, $memo]);
+        $pdo->commit();
+        flash('ok', num($amount) . 'P를 ' . ($isSub ? '차감' : '지급') . '했습니다.');
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        flash('error', $error instanceof RuntimeException ? $error->getMessage() : '포인트를 저장하지 못했습니다. 다시 시도해 주세요.');
+    }
+    redirect_to('/admin/users/' . $id);
+}
+
+function admin_product_order(): never
+{
+    $productId = (int)post_value('product_id');
+    $direction = (string)post_value('direction');
+    if ($productId < 1 || !in_array($direction, ['up', 'down'], true)) {
+        flash('error', '상품 순서를 변경하지 못했어요.');
+        redirect_to('/admin/products');
+    }
+
+    $products = product_rows(true);
+    $ids = array_map(static fn(array $product): int => (int)$product['id'], $products);
+    $index = array_search($productId, $ids, true);
+    if ($index === false) {
+        flash('error', '상품을 찾을 수 없어요.');
+        redirect_to('/admin/products');
+    }
+    $nextIndex = $direction === 'up' ? $index - 1 : $index + 1;
+    if ($nextIndex < 0 || $nextIndex >= count($products)) {
+        redirect_to('/admin/products');
+    }
+
+    [$products[$index], $products[$nextIndex]] = [$products[$nextIndex], $products[$index]];
+    $pdo = db();
+    try {
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('UPDATE products SET sort_order=? WHERE id=?');
+        foreach ($products as $position => $product) $stmt->execute([($position + 1) * 10, (int)$product['id']]);
+        $pdo->commit();
+        flash('ok', '상품 노출 순서를 변경했어요.');
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        flash('error', '상품 순서를 저장하지 못했어요.');
+    }
+    redirect_to('/admin/products');
 }
 
 function admin_product_v2(int $id): never
@@ -1202,7 +1828,7 @@ function admin_settings(): never
     }
     $s = setting_values();
     $checkbox = static fn(string $key): string => $s[$key] ? 'checked' : '';
-    $html = '<div class="page-head"><h1>사이트 설정</h1></div><form method="post" class="card"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><h2>고객 화면</h2><label><input type="checkbox" name="live_on" ' . $checkbox('live_on') . '> 방송 중</label><label><input type="checkbox" name="always_show_price" ' . $checkbox('always_show_price') . '> 방송 전에도 가격 표시</label><label><input type="checkbox" name="show_stock" ' . $checkbox('show_stock') . '> 고객에게 재고 수량 표시</label><label class="field"><span>공지 문구</span><textarea name="notice_text">' . e($s['notice_text']) . '</textarea></label><label class="field"><span>이벤트 문구</span><input name="event_notice_text" value="' . e($s['event_notice_text']) . '"></label><h2>배송</h2><label class="field"><span>무료배송 기준</span><input type="number" name="free_shipping_threshold" value="' . (int)$s['free_shipping_threshold'] . '"></label><label class="field"><span>배송비</span><input type="number" name="shipping_fee" value="' . (int)$s['shipping_fee'] . '"></label><h2>포인트</h2><label class="field"><span>적립 방식</span><select name="point_earn_mode"><option value="off" ' . ($s['point_earn_mode'] === 'off' ? 'selected' : '') . '>사용 안 함</option><option value="flat" ' . ($s['point_earn_mode'] === 'flat' ? 'selected' : '') . '>단일 비율</option><option value="tier" ' . ($s['point_earn_mode'] === 'tier' ? 'selected' : '') . '>당일 합산 2단계</option></select></label><label class="field"><span>30만원 미만 적립률</span><input name="point_earn_under_rate" type="number" step="0.1" value="' . e($s['point_earn_under_rate']) . '"></label><label class="field"><span>30만원 이상 적립률</span><input name="point_earn_over_rate" type="number" step="0.1" value="' . e($s['point_earn_over_rate']) . '"></label><label class="field"><span>등급 기준 금액</span><input name="point_earn_threshold" type="number" value="' . e($s['point_earn_threshold']) . '"></label><label><input type="checkbox" name="point_use_enabled" ' . $checkbox('point_use_enabled') . '> 포인트 사용 허용</label><label class="field"><span>최소 보유 포인트</span><input name="point_min_balance" type="number" value="' . e($s['point_min_balance']) . '"></label><label class="field"><span>사용 단위</span><input name="point_use_unit" type="number" value="' . e($s['point_use_unit']) . '"></label><label class="field"><span>포인트 안내</span><textarea name="point_guide_text">' . e($s['point_guide_text']) . '</textarea></label><h2>현금영수증</h2><label><input type="checkbox" name="cash_receipt_enabled" ' . $checkbox('cash_receipt_enabled') . '> 신청 기능 사용</label><h2>사업자 정보</h2><label class="field"><span>상호</span><input name="biz_name" value="' . e($s['biz_name']) . '"></label><label class="field"><span>대표자</span><input name="biz_owner" value="' . e($s['biz_owner']) . '"></label><label class="field"><span>사업자등록번호</span><input name="biz_reg_no" value="' . e($s['biz_reg_no']) . '"></label><label class="field"><span>주소</span><input name="biz_address" value="' . e($s['biz_address']) . '"></label><label class="field"><span>전화</span><input name="biz_phone" value="' . e($s['biz_phone']) . '"></label><label class="field"><span>이메일</span><input name="biz_email" value="' . e($s['biz_email']) . '"></label><button class="btn pink">저장</button></form>';
+    $html = '<div class="page-head"><h1>사이트 설정</h1></div><form method="post" class="card"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><h2>고객 화면</h2><label><input type="checkbox" name="live_on" ' . $checkbox('live_on') . '> 방송 중</label><label><input type="checkbox" name="always_show_price" ' . $checkbox('always_show_price') . '> 방송 전에도 가격 표시</label><label><input type="checkbox" name="show_stock" ' . $checkbox('show_stock') . '> 고객에게 재고 수량 표시</label><label class="field"><span>공지 문구</span><textarea name="notice_text">' . e($s['notice_text']) . '</textarea></label><label class="field"><span>이벤트 문구</span><input name="event_notice_text" value="' . e($s['event_notice_text']) . '"></label><h2>배송</h2><label class="field"><span>무료배송 기준</span><input type="number" name="free_shipping_threshold" value="' . (int)$s['free_shipping_threshold'] . '"></label><label class="field"><span>배송비</span><input type="number" name="shipping_fee" value="' . (int)$s['shipping_fee'] . '"></label><h2>포인트</h2><label class="field"><span>적립 방식</span><select name="point_earn_mode"><option value="off" ' . ($s['point_earn_mode'] === 'off' ? 'selected' : '') . '>사용 안 함</option><option value="flat" ' . ($s['point_earn_mode'] === 'flat' ? 'selected' : '') . '>단일 비율</option><option value="tier" ' . ($s['point_earn_mode'] === 'tier' ? 'selected' : '') . '>라이브 합산 2단계</option></select></label><label class="field"><span>라이브 누적 30만원 미만 적립률</span><input name="point_earn_under_rate" type="number" step="0.1" value="' . e($s['point_earn_under_rate']) . '"></label><label class="field"><span>라이브 누적 30만원 이상 적립률</span><input name="point_earn_over_rate" type="number" step="0.1" value="' . e($s['point_earn_over_rate']) . '"></label><label class="field"><span>라이브 누적 기준 금액</span><input name="point_earn_threshold" type="number" value="' . e($s['point_earn_threshold']) . '"></label><label><input type="checkbox" name="point_use_enabled" ' . $checkbox('point_use_enabled') . '> 포인트 사용 허용</label><label class="field"><span>최소 보유 포인트</span><input name="point_min_balance" type="number" value="' . e($s['point_min_balance']) . '"></label><label class="field"><span>사용 단위</span><input name="point_use_unit" type="number" value="' . e($s['point_use_unit']) . '"></label><label class="field"><span>포인트 안내</span><textarea name="point_guide_text">' . e($s['point_guide_text']) . '</textarea></label><h2>현금영수증</h2><label><input type="checkbox" name="cash_receipt_enabled" ' . $checkbox('cash_receipt_enabled') . '> 신청 기능 사용</label><h2>사업자 정보</h2><label class="field"><span>상호</span><input name="biz_name" value="' . e($s['biz_name']) . '"></label><label class="field"><span>대표자</span><input name="biz_owner" value="' . e($s['biz_owner']) . '"></label><label class="field"><span>사업자등록번호</span><input name="biz_reg_no" value="' . e($s['biz_reg_no']) . '"></label><label class="field"><span>주소</span><input name="biz_address" value="' . e($s['biz_address']) . '"></label><label class="field"><span>전화</span><input name="biz_phone" value="' . e($s['biz_phone']) . '"></label><label class="field"><span>이메일</span><input name="biz_email" value="' . e($s['biz_email']) . '"></label><button class="btn pink">저장</button></form>';
     $html = str_replace('<h2>배송</h2>', '<h2>입금 안내</h2><label class="field"><span>은행명</span><input name="bank_name" value="' . e($s['bank_name']) . '"></label><label class="field"><span>계좌번호</span><input name="bank_account" value="' . e($s['bank_account']) . '"></label><label class="field"><span>예금주</span><input name="bank_holder" value="' . e($s['bank_holder']) . '"></label><h2>배송</h2>', $html);
     admin_shell('사이트 설정', $html);
 }
@@ -1216,6 +1842,9 @@ function admin_order(int $id): never
     $stmt->execute([$id]);
     $order = $stmt->fetch();
     if (!$order) admin_shell('주문 없음', '<div class="card">주문을 찾을 수 없습니다.</div>');
+    if (empty($order['admin_checked_at'])) {
+        db()->prepare('UPDATE orders SET admin_checked_at=NOW() WHERE id=? AND admin_checked_at IS NULL')->execute([$id]);
+    }
     $items = db()->prepare('SELECT * FROM order_items WHERE order_id=?');
     $items->execute([$id]);
     $list = '';
@@ -1241,16 +1870,46 @@ function admin_order(int $id): never
     $deliveryInfo = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
     $deliveryClass = $order['delivery_type'] === 'keep' ? 'keep' : 'direct';
     $mergeNotice = !empty($order['keep_merge_requested']) ? '기존 킵 ' . won($order['keep_merge_amount']) . ' 같이 배송' : '';
+    $mergeLinks = '';
+    $groupOrders = merge_group_orders(db(), $order);
+    $activeGroupOrders = array_values(array_filter($groupOrders, static fn(array $member): bool => $member['status'] !== 'cancelled'));
+    $activeGroupCount = count($activeGroupOrders);
+    $pendingGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'pending'));
+    $paidGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'paid'));
+    if (count($groupOrders) > 1) {
+        $memberRows = '';
+        foreach ($groupOrders as $member) {
+            if ((int)$member['id'] === (int)$order['id']) continue;
+            $isRoot = empty($member['merge_order_id']);
+            $warn = '';
+            if ($member['status'] === 'pending') $warn = ' <span class="warn">입금 대기 · 확인 후 함께 발송</span>';
+            elseif ($isRoot && in_array($member['status'], ['shipped', 'cancelled'], true) && in_array($order['status'], ['pending', 'paid', 'preparing'], true)) $warn = ' <span class="warn">대표 주문이 이미 ' . e(order_status_label($member)) . ' · 이 주문은 배송비 없이 단독 발송되니 확인 필요</span>';
+            $quickConfirm = '';
+            if ($member['status'] === 'pending' && $member['payment_method'] === 'bank') {
+                $quickConfirm = '<form method="post" action="/admin/orders/' . (int)$member['id'] . '" class="merge-quick-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders/' . (int)$order['id'] . '"><button class="btn sm ok" type="submit" name="action" value="confirm">입금 확인</button></form>';
+            }
+            $memberRows .= '<div class="merge-member"><span>' . ($isRoot ? '대표 주문' : '추가 주문') . ' <a href="/admin/orders/' . (int)$member['id'] . '">' . e($member['order_no']) . '</a> · ' . e(order_status_label($member)) . ' · ' . won($member['total_amount']) . $warn . '</span>' . $quickConfirm . '</div>';
+        }
+        $mergeRole = empty($order['merge_order_id']) ? '대표 주문' : '추가 주문 · 배송비 없음';
+        $mergeLinks = '<div class="order-merge-links"><strong>합배송 ' . num($activeGroupCount) . '건 · ' . $mergeRole . '</strong>' . $memberRows . '<span class="muted">모든 추가 주문의 입금 확인이 끝나면 묶음 전체를 한 번에 배송 처리해요.</span></div>';
+    }
     $actionButtons = '';
     if ($order['status'] === 'pending') $actionButtons .= '<button class="btn pink" name="action" value="confirm">입금 확인 · 결제 완료</button>';
-    if ($order['status'] === 'paid') $actionButtons .= '<button class="btn pink" name="action" value="prepare">배송 준비중으로 변경</button>';
-    if ($order['status'] === 'preparing') $actionButtons .= '<button class="btn pink" name="action" value="ship">배송 완료 처리</button>';
+    if ($order['status'] === 'paid') {
+        if ($activeGroupCount > 1 && $pendingGroupCount > 0) $actionButtons .= '<button class="btn pink" type="button" disabled>입금대기 ' . num($pendingGroupCount) . '건 확인 후 배송 준비</button>';
+        else $actionButtons .= '<button class="btn pink" name="action" value="prepare">' . ($activeGroupCount > 1 ? '합배송 ' . num($activeGroupCount) . '건 배송 준비' : '배송 준비중으로 변경') . '</button>';
+    }
+    if ($order['status'] === 'preparing') {
+        if ($pendingGroupCount > 0 || $paidGroupCount > 0) $actionButtons .= '<button class="btn pink" type="button" disabled>묶음 주문 상태 확인 후 배송 완료</button>';
+        else $actionButtons .= '<button class="btn pink" name="action" value="ship">' . ($activeGroupCount > 1 ? '합배송 ' . num($activeGroupCount) . '건 배송 완료' : '배송 완료 처리') . '</button>';
+    }
     if ($order['status'] !== 'cancelled' && $order['status'] === 'shipped') $actionButtons .= '<input type="hidden" name="cancel_kind" value="return"><button class="btn danger" name="action" value="cancel">반품 · 환불 처리</button>';
     if ($order['status'] !== 'cancelled' && $order['status'] !== 'shipped') $actionButtons .= '<label class="action-select"><span>취소 유형</span><select name="cancel_kind"><option value="cancel">주문 취소 · 환불</option><option value="return">반품 · 환불</option></select></label><button class="btn danger" name="action" value="cancel">취소 처리</button>';
     if ($order['status'] === 'cancelled') $actionButtons .= '<button class="btn danger" name="action" value="delete" data-confirm-dialog="' . e($order['order_no']) . ' 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 자체 삭제</button>';
     if ($actionButtons === '') $actionButtons = '<span class="hint">추가로 처리할 작업이 없습니다.</span>';
     $receiptLabel = $order['cash_receipt_type'] === 'income' ? '소득공제용' : ($order['cash_receipt_type'] === 'expense' ? '지출증빙용' : '신청 안 함');
-    $html = '<div class="page-head"><div><h1>주문 ' . e($order['order_no']) . '</h1><p class="page-sub">결제부터 배송 완료, 취소·반품까지 한 건의 판매 기록으로 관리합니다.</p></div><a class="btn ghost" href="/admin/orders">주문 원장</a></div><div class="order-layout"><div class="order-main"><section class="card order-card"><div class="order-card-heading"><h2>주문 상품</h2><span class="muted">' . num($itemCount) . '개 상품</span></div><div class="order-items-list">' . ($list ?: '<p class="empty">상품 정보가 없습니다.</p>') . '</div><div class="order-price-list"><div><span>상품금액</span><b class="num">' . won($order['items_amount']) . '</b></div><div><span>배송비</span><b class="num">' . ((int)$order['shipping_fee'] ? won($order['shipping_fee']) : '무료') . '</b></div>' . ((int)$order['point_used'] ? '<div><span>포인트 사용</span><b class="num discount">-' . num($order['point_used']) . 'P</b></div>' : '') . '<div class="total"><span>결제금액</span><strong class="num">' . won($order['total_amount']) . '</strong></div></div></section><section class="card order-card"><div class="order-card-heading"><h2>주문 처리 이력</h2><span class="muted">' . num($eventCount) . '건</span></div><ol class="order-history">' . $history . '</ol></section><section class="card order-card"><div class="order-card-heading"><h2>주문 메모</h2></div><p class="order-memo">' . ($order['memo'] ? nl2br(e($order['memo'])) : '남겨진 배송 메모가 없습니다.') . '</p></section></div><aside class="order-side"><section class="card order-card"><div class="order-status-line"><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span><span class="chip ' . $deliveryClass . '">' . e($deliveryInfo) . '</span></div>' . ($mergeNotice ? '<p class="order-merge">' . e($mergeNotice) . '</p>' : '') . '<dl class="order-meta"><div><dt>회원</dt><dd>' . e($order['login_id']) . '</dd></div><div><dt>받는 분</dt><dd>' . e($order['recipient_name']) . '<br>' . e($order['recipient_phone']) . '</dd></div><div><dt>주소</dt><dd>' . e(trim($order['address1'] . ' ' . $order['address2'])) . '</dd></div><div><dt>결제수단</dt><dd>' . e($order['payment_method'] === 'card' ? '카드결제' : '계좌이체') . '</dd></div><div><dt>현금영수증</dt><dd>' . e($receiptLabel) . ($order['cash_receipt_value'] ? '<br>' . e($order['cash_receipt_value']) : '') . '</dd></div></dl></section><section class="card order-card order-action-card"><h2>주문 처리</h2><p class="action-help">계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.</p><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><div class="order-actions">' . $actionButtons . '</div></form></section></aside></div>';
+    $actionHelp = $activeGroupCount > 1 ? '합배송 주문은 모든 입금 확인이 끝난 뒤 묶음 전체가 함께 배송 준비·완료 처리됩니다.' : '계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.';
+    $html = '<div class="page-head"><div><h1>주문 ' . e($order['order_no']) . '</h1><p class="page-sub">결제부터 배송 완료, 취소·반품까지 한 건의 판매 기록으로 관리합니다.</p></div><a class="btn ghost" href="/admin/orders">주문 원장</a></div><div class="order-layout"><div class="order-main"><section class="card order-card"><div class="order-card-heading"><h2>주문 상품</h2><span class="muted">' . num($itemCount) . '개 상품</span></div><div class="order-items-list">' . ($list ?: '<p class="empty">상품 정보가 없습니다.</p>') . '</div><div class="order-price-list"><div><span>상품금액</span><b class="num">' . won($order['items_amount']) . '</b></div><div><span>배송비</span><b class="num">' . ((int)$order['shipping_fee'] ? won($order['shipping_fee']) : '무료') . '</b></div>' . ((int)$order['point_used'] ? '<div><span>포인트 사용</span><b class="num discount">-' . num($order['point_used']) . 'P</b></div>' : '') . '<div class="total"><span>결제금액</span><strong class="num">' . won($order['total_amount']) . '</strong></div></div></section><section class="card order-card"><div class="order-card-heading"><h2>주문 처리 이력</h2><span class="muted">' . num($eventCount) . '건</span></div><ol class="order-history">' . $history . '</ol></section><section class="card order-card"><div class="order-card-heading"><h2>주문 메모</h2></div><p class="order-memo">' . ($order['memo'] ? nl2br(e($order['memo'])) : '남겨진 배송 메모가 없습니다.') . '</p></section></div><aside class="order-side"><section class="card order-card"><div class="order-status-line"><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span><span class="chip ' . $deliveryClass . '">' . e($deliveryInfo) . '</span></div>' . ($mergeNotice ? '<p class="order-merge">' . e($mergeNotice) . '</p>' : '') . $mergeLinks . '<dl class="order-meta"><div><dt>회원</dt><dd>' . e($order['login_id']) . '</dd></div><div><dt>받는 분</dt><dd>' . e($order['recipient_name']) . '<br>' . e($order['recipient_phone']) . '</dd></div><div><dt>주소</dt><dd>' . e(trim($order['address1'] . ' ' . $order['address2'])) . '</dd></div><div><dt>결제수단</dt><dd>' . e($order['payment_method'] === 'card' ? '카드결제' : '계좌이체') . '</dd></div><div><dt>현금영수증</dt><dd>' . e($receiptLabel) . ($order['cash_receipt_value'] ? '<br>' . e($order['cash_receipt_value']) : '') . '</dd></div></dl></section><section class="card order-card order-action-card"><h2>주문 처리</h2><p class="action-help">' . e($actionHelp) . '</p><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><div class="order-actions">' . $actionButtons . '</div></form></section></aside></div>';
     admin_shell('주문 상세', $html);
 }
 
@@ -1263,6 +1922,7 @@ function admin_order_action(int $id, string $action, string $cancelKind = 'cance
         $stmt->execute([$id]);
         $order = $stmt->fetch();
         if (!$order) throw new RuntimeException('주문을 찾을 수 없습니다.');
+        $pdo->prepare('UPDATE orders SET admin_checked_at=COALESCE(admin_checked_at,NOW()) WHERE id=?')->execute([$id]);
         if ($action === 'delete') {
             if ($order['status'] !== 'cancelled') throw new RuntimeException('취소된 주문만 삭제할 수 있습니다. 먼저 주문을 취소해 주세요.');
             if (!empty($order['shipment_request_id'])) throw new RuntimeException('출고 이력이 연결된 주문은 삭제할 수 없습니다.');
@@ -1276,17 +1936,19 @@ function admin_order_action(int $id, string $action, string $cancelKind = 'cance
         if ($action === 'confirm' && $order['status'] === 'pending') {
             $policy = point_policy(setting_values());
             $earned = 0;
-            if ($policy['mode'] === 'flat') {
+            $isTier = $policy['mode'] === 'tier';
+            if (!$isTier && $policy['mode'] === 'flat') {
                 $earned = points_for((float)$order['items_amount'], (float)$order['point_used'], (float)$policy['rate']);
-            } elseif ($policy['mode'] === 'tier') {
-                $prior = $pdo->prepare("SELECT COALESCE(SUM(items_amount-point_used),0) FROM orders WHERE user_id=? AND payment_method='bank' AND status<>'cancelled' AND paid_at>=?");
-                $prior->execute([$order['user_id'], date('Y-m-d 00:00:00')]);
-                $dayTotal = (float)$prior->fetchColumn() + (float)$order['items_amount'] - (float)$order['point_used'];
-                $rate = $dayTotal >= (float)$policy['threshold'] ? (float)$policy['over'] : (float)$policy['under'];
-                $earned = points_for((float)$order['items_amount'], (float)$order['point_used'], $rate);
             }
             $nextStatus = $order['delivery_type'] === 'keep' ? 'kept' : 'paid';
             $shipmentRequestId = null;
+            if ($nextStatus === 'paid' && !empty($order['merge_order_id'])) {
+                $parentStmt = $pdo->prepare('SELECT id,status FROM orders WHERE id=? FOR UPDATE');
+                $parentStmt->execute([(int)$order['merge_order_id']]);
+                $mergeParent = $parentStmt->fetch();
+                // 기존 데이터에서 대표 주문이 먼저 준비 처리된 경우에도 추가 주문을 같은 단계로 맞춘다.
+                if ($mergeParent && $mergeParent['status'] === 'preparing') $nextStatus = 'preparing';
+            }
             if ($nextStatus === 'paid' && !empty($order['keep_merge_requested'])) {
                 $keepStmt = $pdo->prepare("SELECT id,items_amount FROM orders WHERE user_id=? AND status='kept' AND shipment_request_id IS NULL ORDER BY paid_at,id FOR UPDATE");
                 $keepStmt->execute([$order['user_id']]);
@@ -1304,22 +1966,41 @@ function admin_order_action(int $id, string $action, string $cancelKind = 'cance
                     $nextStatus = 'preparing';
                 }
             }
-            $pdo->prepare('UPDATE orders SET status=?,paid_at=NOW(),reserve_expires_at=NULL,point_earned=?,shipment_request_id=? WHERE id=?')->execute([$nextStatus,$earned,$shipmentRequestId,$id]);
-            if ($earned > 0) {
+            $pdo->prepare('UPDATE orders SET status=?,paid_at=NOW(),reserve_expires_at=NULL,point_earned=?,shipment_request_id=? WHERE id=?')->execute([$nextStatus, $isTier ? 0 : $earned, $shipmentRequestId, $id]);
+            if (!$isTier && $earned > 0) {
                 $balance = $pdo->prepare('SELECT point_balance FROM users WHERE id=?');
                 $balance->execute([$order['user_id']]);
                 $after = (int)$balance->fetchColumn() + $earned;
                 $pdo->prepare('UPDATE users SET point_balance=? WHERE id=?')->execute([$after,$order['user_id']]);
                 $pdo->prepare('INSERT INTO point_ledger (user_id,type,amount,balance_after,order_id,memo) VALUES (?,?,?,?,?,?)')->execute([$order['user_id'],'earn',$earned,$after,$id,'주문 적립']);
             }
-            log_order_event($pdo, $id, 'payment_confirmed', 'pending', $nextStatus, '입금 확인 · 결제 완료', 0, 'admin');
+            if ($isTier) {
+                $reconciled = reconcile_live_session_points($pdo, (int)$order['user_id'], (string)($order['live_session_started_at'] ?? ''), $policy);
+                $earned = (int)($reconciled['earned'][$id] ?? 0);
+            }
+            log_order_event($pdo, $id, 'payment_confirmed', 'pending', $nextStatus, $nextStatus === 'preparing' ? '입금 확인 · 합배송 묶음과 함께 배송 준비중' : '입금 확인 · 결제 완료', 0, 'admin');
             $pdo->prepare('UPDATE payments SET status="paid",paid_at=NOW() WHERE target_type="order" AND target_id=?')->execute([$id]);
         } elseif ($action === 'prepare' && $order['status'] === 'paid') {
-            $pdo->prepare("UPDATE orders SET status='preparing' WHERE id=?")->execute([$id]);
-            log_order_event($pdo, $id, 'status_changed', 'paid', 'preparing', '배송 준비중으로 변경', 0, 'admin');
+            // 합배송 약속이 깨지지 않도록 모든 추가 주문의 입금 확인이 끝난 뒤 묶음 전체를 처리한다.
+            $mergeMembers = merge_group_orders($pdo, $order, true);
+            $pendingMembers = array_filter($mergeMembers, static fn(array $member): bool => $member['status'] === 'pending');
+            if ($pendingMembers) throw new RuntimeException('합배송 묶음에 입금 대기 주문 ' . count($pendingMembers) . '건이 있습니다. 먼저 입금 확인하거나 미입금 주문을 취소해 주세요.');
+            foreach ($mergeMembers as $member) {
+                $memberId = (int)$member['id'];
+                if ($member['status'] !== 'paid') continue;
+                $pdo->prepare("UPDATE orders SET status='preparing' WHERE id=?")->execute([$memberId]);
+                log_order_event($pdo, $memberId, 'status_changed', 'paid', 'preparing', $memberId === $id ? '배송 준비중으로 변경' : '합배송 묶음과 함께 배송 준비중으로 변경', 0, 'admin');
+            }
         } elseif ($action === 'ship' && $order['status'] === 'preparing') {
-            $pdo->prepare("UPDATE orders SET status='shipped',shipped_at=NOW() WHERE id=?")->execute([$id]);
-            log_order_event($pdo, $id, 'shipped', 'preparing', 'shipped', '배송 완료 · 판매 완료', 0, 'admin');
+            $mergeMembers = merge_group_orders($pdo, $order, true);
+            $notReadyMembers = array_filter($mergeMembers, static fn(array $member): bool => in_array($member['status'], ['pending', 'paid'], true));
+            if ($notReadyMembers) throw new RuntimeException('합배송 묶음에 아직 배송 준비 전인 주문 ' . count($notReadyMembers) . '건이 있습니다. 주문 상태를 먼저 확인해 주세요.');
+            foreach ($mergeMembers as $member) {
+                $memberId = (int)$member['id'];
+                if ($member['status'] !== 'preparing') continue;
+                $pdo->prepare("UPDATE orders SET status='shipped',shipped_at=NOW() WHERE id=?")->execute([$memberId]);
+                log_order_event($pdo, $memberId, 'shipped', 'preparing', 'shipped', $memberId === $id ? '배송 완료 · 판매 완료' : '합배송 묶음 배송 완료 · 판매 완료', 0, 'admin');
+            }
             if (!empty($order['shipment_request_id'])) {
                 $linked = $pdo->prepare("SELECT id,status FROM orders WHERE shipment_request_id=? AND id<>? FOR UPDATE");
                 $linked->execute([$order['shipment_request_id'], $id]);
@@ -1363,6 +2044,10 @@ function admin_order_action(int $id, string $action, string $cancelKind = 'cance
             $eventType = $cancelKind === 'return' ? 'return_completed' : 'cancelled';
             $pdo->prepare('UPDATE payments SET status="cancelled" WHERE target_type="order" AND target_id=? AND status IN ("ready","paid")')->execute([$id]);
             $pdo->prepare("UPDATE orders SET status='cancelled',cancelled_at=NOW(),cancel_reason=?,point_earned=0 WHERE id=?")->execute([$reason, $id]);
+            if ($order['payment_method'] === 'bank' && $order['paid_at']) {
+                $policy = point_policy(setting_values());
+                if ($policy['mode'] === 'tier') reconcile_live_session_points($pdo, (int)$order['user_id'], (string)($order['live_session_started_at'] ?? ''), $policy);
+            }
             log_order_event($pdo, $id, $eventType, $oldStatus, 'cancelled', $reason . ($refundAmount > 0 ? ' · 실제 환불 필요' : ''), $refundAmount, 'admin');
         }
         $pdo->commit();
@@ -1371,7 +2056,8 @@ function admin_order_action(int $id, string $action, string $cancelKind = 'cance
         if ($pdo->inTransaction()) $pdo->rollBack();
         flash('error', $error->getMessage());
     }
-    redirect_to(post_value('return_to') === '/admin/orders' ? '/admin/orders' : '/admin/orders/' . $id);
+    $returnTo = (string)post_value('return_to');
+    redirect_to(preg_match('#^/admin/orders(?:/\d+)?$#', $returnTo) ? $returnTo : '/admin/orders/' . $id);
 }
 
 function admin_page_edit(string $slug): never

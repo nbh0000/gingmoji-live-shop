@@ -11,5 +11,5 @@
     </div>
     <div class="k" style="margin-top:6px"><%= typeof amountText !== 'undefined' ? amountText : '주문 후 안내되는 금액을 위 계좌로 입금해 주세요.' %></div>
   </div>
-  <label class="field" style="margin:12px 0 0"><span>입금자명</span><input name="depositorName" value="<%= user.name %>" maxlength="50"></label>
+  <label class="field payment-depositor" style="margin:12px 0 0"><span>입금자명 <em class="required-mark">필수</em></span><input name="depositorName" value="<%= user.name %>" maxlength="50" autocomplete="name" required></label>
 </div>

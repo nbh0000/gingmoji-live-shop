@@ -44,7 +44,7 @@
     <h2>결제수단</h2>
     <div class="choices">
       <label class="choice"><input type="radio" name="payment" value="bank" <%= config.portone.enabled ? '' : 'checked' %>>
-        <span class="tile"><span class="t">🏦 계좌이체</span><span class="d"><%= s.bank_name %> 입금<% if (s.point_earn_mode === 'tier') { %><br><%= s.point_earn_under_rate %>%~<%= s.point_earn_over_rate %>% 적립<% } else if (s.point_earn_mode === 'flat' && s.point_earn_rate) { %><br>포인트 <%= s.point_earn_rate %>% 적립<% } %></span></span></label>
+        <span class="tile"><span class="t">🏦 계좌이체</span><span class="d"><%= s.bank_name %> 입금<% if (s.point_earn_mode === 'tier') { %><br>라이브 <%= s.point_earn_under_rate %>%~<%= s.point_earn_over_rate %>% 적립<% } else if (s.point_earn_mode === 'flat' && s.point_earn_rate) { %><br>포인트 <%= s.point_earn_rate %>% 적립<% } %></span></span></label>
       <label class="choice"><input type="radio" name="payment" value="card" <%= config.portone.enabled ? 'checked' : 'disabled' %>>
         <span class="tile"><span class="t">💳 카드결제</span><span class="d"><%= config.portone.enabled ? '바로 결제 완료' : '준비 중이에요' %></span></span></label>
     </div>

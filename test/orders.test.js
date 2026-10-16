@@ -9,7 +9,7 @@ const orders = require('../src/services/orders');
 const shipments = require('../src/services/shipments');
 
 const order = (userId, lines, extra = {}) =>
-  orders.createOrder(userId, { lines, deliveryType: 'direct', paymentMethod: 'bank', recipient, ...extra }, { cardEnabled: true });
+  orders.createOrder(userId, { lines, deliveryType: 'direct', paymentMethod: 'bank', recipient, depositorName: '테스트입금자', ...extra }, { cardEnabled: true });
 
 const stockOf = async (id) => (await db.one('SELECT stock FROM products WHERE id = ?', [id])).stock;
 const balanceOf = async (id) => (await db.one('SELECT point_balance FROM users WHERE id = ?', [id])).point_balance;

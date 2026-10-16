@@ -42,9 +42,9 @@
   <section class="card">
     <h2>포인트</h2>
     <div class="form-grid">
-      <label class="field"><span>적립 방식</span><select name="point_earn_mode"><option value="tier" <%= s.point_earn_mode === 'tier' ? 'selected' : '' %>>당일 합산 금액별 적립</option><option value="flat" <%= s.point_earn_mode === 'flat' ? 'selected' : '' %>>단일 적립률</option><option value="off" <%= s.point_earn_mode === 'off' ? 'selected' : '' %>>적립 안 함</option></select><small>계좌이체 입금 확인 시 적용됩니다. 당일 합산 기준을 넘으면 해당 날짜의 기존 적립도 자동 보정됩니다.</small></label>
+      <label class="field"><span>적립 방식</span><select name="point_earn_mode"><option value="tier" <%= s.point_earn_mode === 'tier' ? 'selected' : '' %>>라이브 합산 금액별 적립</option><option value="flat" <%= s.point_earn_mode === 'flat' ? 'selected' : '' %>>단일 적립률</option><option value="off" <%= s.point_earn_mode === 'off' ? 'selected' : '' %>>적립 안 함</option></select><small>계좌이체 입금 확인 시 적용됩니다. 라이브가 끝나면 누적 기준이 초기화되고, 기준을 넘으면 해당 라이브의 기존 적립도 자동 보정됩니다.</small></label>
       <label class="field"><span>기존 단일 적립률 (%)</span><input name="point_earn_rate" value="<%= s.point_earn_rate %>" inputmode="decimal" placeholder="단일 적립률 사용 시"><small>단일 적립률 방식을 선택했을 때만 사용됩니다.</small></label>
-      <label class="field"><span>당일 합산 기준 금액 (원)</span><input name="point_earn_threshold" type="number" min="0" step="10000" value="<%= s.point_earn_threshold %>"></label>
+      <label class="field"><span>라이브 합산 기준 금액 (원)</span><input name="point_earn_threshold" type="number" min="0" step="10000" value="<%= s.point_earn_threshold %>"></label>
       <label class="field"><span>기준 미만 적립률 (%)</span><input name="point_earn_under_rate" type="number" min="0" step="0.1" value="<%= s.point_earn_under_rate %>"></label>
       <label class="field"><span>기준 이상 적립률 (%)</span><input name="point_earn_over_rate" type="number" min="0" step="0.1" value="<%= s.point_earn_over_rate %>"></label>
       <label class="switch full"><input type="checkbox" name="point_use_enabled" value="1" <%= s.point_use_enabled ? 'checked' : '' %>> 주문 시 포인트 사용 허용</label>
