@@ -67,7 +67,7 @@
     var hint = $('[data-free-hint]');
     if (mo) {
       hint.hidden = false;
-      hint.textContent = '주문 ' + mo.orderNo + '과 함께 보내드려요. 배송비가 다시 붙지 않아요.';
+      hint.textContent = '배송 대기 중인 ‘' + mo.productLabel + '’ 상품에 함께 담아 보내드려요. 추가 배송비는 없어요.';
     } else if (sm && sm.deliveryType === 'direct' && sm.remainingForFree > 0) {
       hint.hidden = false;
       hint.innerHTML = (sm.includeKept && sm.keptAmount ? '킵 ' + S.won(sm.keptAmount) + '을 합산해도 ' : '') + '<b style="color:var(--pink-dd)">' + S.won(sm.remainingForFree) + '</b> 더 담으면 무료배송이에요';
@@ -119,7 +119,7 @@
     mergeWasActive = !!opt;
     if (hint) {
       hint.hidden = !opt;
-      if (opt) hint.textContent = '주문 ' + opt.getAttribute('data-merge-no') + '의 받는 분·주소를 그대로 사용해 함께 보내드려요.';
+      if (opt) hint.textContent = '‘' + opt.getAttribute('data-merge-label') + '’ 상품을 받을 주소로 함께 보내드려요.';
     }
     syncKeepMerge();
   }

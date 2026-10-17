@@ -485,14 +485,31 @@ body.has-cartbar main.wrap { max-width: 820px; }
 .keep-merge .check { padding: 0; }
 .keep-merge .hint { margin: 5px 0 0 32px; }
 .delivery-choices { margin-bottom: 4px; }
-.order-merge-box { display: grid; gap: 4px; }
-.order-merge-box .merge-title { margin: 0; font-weight: 800; font-size: 15px; }
-.order-merge-box .merge-hint { margin: 0 0 6px; }
-.merge-option { align-items: flex-start; }
-.merge-option input { margin-top: 2px; }
-.merge-option .merge-option-body { display: flex; flex-direction: column; gap: 2px; line-height: 1.35; }
-.merge-option .merge-option-body .meta { font-size: 12px; color: var(--muted); font-weight: 500; }
-.merge-option .merge-option-body small { color: var(--muted); font-size: 12.5px; }
+.order-merge-box { min-width: 0; margin: 18px 0 24px; padding: 0; border: 0; }
+.order-merge-box legend { padding: 0; font-size: 17px; font-weight: 800; }
+.order-merge-box .merge-hint { margin: 10px 0 12px; line-height: 1.5; }
+.merge-options { display: grid; gap: 8px; }
+.merge-option { position: relative; display: block; min-width: 0; cursor: pointer; }
+.merge-option input { position: absolute; z-index: 1; top: 18px; left: 16px; width: 22px; height: 22px; margin: 0; accent-color: var(--pink-d); }
+.merge-option-body {
+  display: grid; gap: 4px; min-height: 80px; padding: 14px 14px 14px 50px;
+  border-radius: var(--r-md); background: #f8f1ef;
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: background 140ms, box-shadow 140ms;
+}
+.merge-option-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.merge-option-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 15px; line-height: 1.4; }
+.merge-option-heading b { flex: none; color: var(--ink); font-size: 14px; }
+.merge-option-meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.merge-option-body small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.merge-option input:checked + .merge-option-body { background: var(--pink-ll); box-shadow: inset 0 0 0 2px var(--pink-d); }
+.merge-option input:focus-visible + .merge-option-body { outline: 3px solid var(--pink-d); outline-offset: 2px; }
+.merge-option-separate .merge-option-body { min-height: 66px; }
+.merge-option-separate .merge-option-heading b { color: var(--muted); font-size: 12px; }
+.checkout-total-hint { margin: 24px 0 14px; line-height: 1.5; }
+.checkout-total { margin: 0 0 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.checkout-total .sum-row { padding-block: 5px; }
+.checkout-total .sum-row.total { margin-top: 5px; padding-top: 12px; }
 
 /* 선택 타일 (배송방식, 결제수단) */
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

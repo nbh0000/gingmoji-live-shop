@@ -90,6 +90,8 @@ function default_settings(): array
         'biz_phone' => '010-0000-0000',
         'biz_email' => 'gingmoji@example.com',
         'biz_privacy_officer' => '김민정',
+        'kakao_channel_url' => 'https://pf.kakao.com/_MszFX',
+        'kakao_chat_url' => 'https://pf.kakao.com/_MszFX/chat',
     ];
 }
 
@@ -314,11 +316,18 @@ function mergeable_paid_orders(int $userId): array
     return $stmt->fetchAll();
 }
 
+function compact_product_names(string $itemNames, string $fallback = '상품'): string
+{
+    $names = array_values(array_unique(array_filter(array_map('trim', explode(',', $itemNames)), static fn(string $name): bool => $name !== '')));
+    if (!$names) return $fallback;
+    return $names[0] . (count($names) > 1 ? ' 외 ' . (count($names) - 1) . '개' : '');
+}
+
 // 합배송 묶음(대표 주문 + 추가 주문). 대표 주문이 먼저 온다. 묶음이 없으면 자기 자신만 돌려준다.
 function merge_group_orders(PDO $pdo, array $order, bool $lock = false): array
 {
     $rootId = (int)(!empty($order['merge_order_id']) ? $order['merge_order_id'] : $order['id']);
-    $stmt = $pdo->prepare('SELECT * FROM orders WHERE id=? OR merge_order_id=? ORDER BY (id=?) DESC, id' . ($lock ? ' FOR UPDATE' : ''));
+    $stmt = $pdo->prepare("SELECT o.*, (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names FROM orders o WHERE o.id=? OR o.merge_order_id=? ORDER BY (o.id=?) DESC, o.id" . ($lock ? ' FOR UPDATE' : ''));
     $stmt->execute([$rootId, $rootId, $rootId]);
     return $stmt->fetchAll();
 }

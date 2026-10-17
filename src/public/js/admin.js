@@ -128,13 +128,22 @@
   // 일괄 선택
   var all = $('[data-check-all]');
   function syncSel() {
-    var n = $$('[data-check]:checked').length;
+    var checks = $$('[data-check]');
+    var n = checks.filter(function (check) { return check.checked; }).length;
     var c = $('[data-sel-count]');
     if (c) c.textContent = n;
     $$('[data-need-sel]').forEach(function (b) { b.disabled = n === 0; });
+    if (all) {
+      all.checked = checks.length > 0 && n === checks.length;
+      all.indeterminate = n > 0 && n < checks.length;
+    }
   }
   if (all) all.addEventListener('change', function () { $$('[data-check]').forEach(function (c) { c.checked = all.checked; }); syncSel(); });
   $$('[data-check]').forEach(function (c) { c.addEventListener('change', syncSel); });
+  var labelPrintForm = $('[data-label-print-form]');
+  if (labelPrintForm) labelPrintForm.addEventListener('submit', function (event) {
+    if (!$$('[data-check]:checked').length) event.preventDefault();
+  });
   syncSel();
 
   // 상품 빠른 수정 (재고, 노출, 품절)

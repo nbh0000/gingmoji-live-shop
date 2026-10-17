@@ -53,6 +53,10 @@ const DEFAULTS = {
   biz_email: 'gingmoji@example.com',
   biz_privacy_officer: '김민정',
 
+  // ===== 고객 상담 =====
+  kakao_channel_url: 'https://pf.kakao.com/_MszFX',
+  kakao_chat_url: 'https://pf.kakao.com/_MszFX/chat',
+
   // ===== 안내 문구 =====
   notice_text: '',
 };

@@ -75,7 +75,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php11' : '/static/css/shop.css?v=php20';
+    $css = $admin ? '/static/css/admin.css?v=php13' : '/static/css/shop.css?v=php21';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -94,7 +94,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
         if ($flash) {
             echo '<div class="flash ' . ($flash[0] === 'error' ? 'error' : '') . '" role="status" aria-live="polite">' . e($flash[1]) . '</div>';
         }
-        echo $adminNewOrderMarker . $body . '</main></div><script src="/static/js/admin.js?v=php10"></script></body></html>';
+        echo $adminNewOrderMarker . $body . '</main></div><script src="/static/js/admin.js?v=php11"></script></body></html>';
         exit;
     }
 
@@ -114,7 +114,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
         echo '<div class="toast show ' . ($flash[0] === 'error' ? 'error' : '') . '" data-flash role="status">' . e($flash[1]) . '</div>';
     }
     echo $body;
-    echo '<footer class="foot"><div class="wrap"><div class="brand">깅모지</div><nav class="foot-links"><a href="/page/terms">이용약관</a><a href="/page/privacy">개인정보처리방침</a><a href="/page/refund">교환·환불 정책</a></nav><div class="biz"><span>상호 ' . e($s['biz_name']) . '</span><span>대표자 ' . e($s['biz_owner']) . '</span><br><span>사업자등록번호 ' . e($s['biz_reg_no']) . '</span><br><span>주소 ' . e($s['biz_address']) . '</span><br><span>연락처 ' . e($s['biz_phone']) . '</span></div></div></footer>';
+    echo '<footer class="foot"><div class="wrap"><div class="brand">깅모지</div><nav class="foot-links"><a href="/page/terms">이용약관</a><a href="/page/privacy">개인정보처리방침</a><a href="/page/refund">교환·환불 정책</a><a class="strong" href="' . e($s['kakao_chat_url']) . '" target="_blank" rel="noopener noreferrer">카카오톡 문의</a></nav><div class="biz"><span>상호 ' . e($s['biz_name']) . '</span><span>대표자 ' . e($s['biz_owner']) . '</span><br><span>사업자등록번호 ' . e($s['biz_reg_no']) . '</span><br><span>주소 ' . e($s['biz_address']) . '</span><br><span>연락처 ' . e($s['biz_phone']) . '</span></div></div></footer>';
     echo '<script>window.GM=' . json_encode($gm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script><script src="/static/js/shop.js?v=php17"></script>' . $extra . '</body></html>';
     exit;
 }
@@ -817,7 +817,7 @@ function cart_quote(array $input): array
         $pointUse = $maxPoints;
     }
     $total = max(0, $itemsAmount + $shipping - $pointUse);
-    return ['ok' => true, 'live' => (bool)$settings['live_on'], 'lines' => $lines, 'hasProblem' => $hasProblem, 'summary' => ['itemsAmount' => $itemsAmount, 'keptAmount' => $keptAmount, 'includeKept' => (bool)$includeKept, 'shippingBase' => $shippingBase, 'shippingFee' => $shipping, 'deliveryType' => $delivery, 'pointUsed' => $pointUse, 'total' => $total, 'maxPoints' => $maxPoints, 'mergeOrder' => $mergeOrder ? ['id' => (int)$mergeOrder['id'], 'orderNo' => (string)$mergeOrder['order_no']] : null, 'remainingForFree' => $mergeOrder ? 0 : max(0, (int)$settings['free_shipping_threshold'] - $shippingBase)]];
+    return ['ok' => true, 'live' => (bool)$settings['live_on'], 'lines' => $lines, 'hasProblem' => $hasProblem, 'summary' => ['itemsAmount' => $itemsAmount, 'keptAmount' => $keptAmount, 'includeKept' => (bool)$includeKept, 'shippingBase' => $shippingBase, 'shippingFee' => $shipping, 'deliveryType' => $delivery, 'pointUsed' => $pointUse, 'total' => $total, 'maxPoints' => $maxPoints, 'mergeOrder' => $mergeOrder ? ['id' => (int)$mergeOrder['id'], 'productLabel' => compact_product_names((string)$mergeOrder['item_names'])] : null, 'remainingForFree' => $mergeOrder ? 0 : max(0, (int)$settings['free_shipping_threshold'] - $shippingBase)]];
 }
 
 function create_order(array $input): never
@@ -979,13 +979,15 @@ function render_checkout(): never
     $keepMerge = $keptAmount > 0 ? '<div class="keep-merge" data-keep-merge hidden><label class="check"><input type="checkbox" name="includeKept" data-include-kept> 킵 보관 상품도 같이 배송받기 <span class="meta">(' . won($keptAmount) . ' 보관 중)</span></label><p class="hint">보관 중인 상품금액과 이번 주문을 합산해 8만 원 이상이면 배송비가 무료예요.</p></div>' : '';
     $mergeOptions = '';
     foreach (mergeable_paid_orders((int)$user['id']) as $index => $paidOrder) {
-        $attrs = ' data-merge-no="' . e($paidOrder['order_no']) . '" data-merge-name="' . e($paidOrder['recipient_name']) . '" data-merge-phone="' . e($paidOrder['recipient_phone']) . '" data-merge-zipcode="' . e($paidOrder['zipcode']) . '" data-merge-address1="' . e($paidOrder['address1']) . '" data-merge-address2="' . e($paidOrder['address2']) . '"';
-        $mergeOptions .= '<label class="check merge-option"><input type="radio" name="mergeOrderId" value="' . (int)$paidOrder['id'] . '"' . $attrs . ($index === 0 ? ' checked' : '') . '><span class="merge-option-body"><strong>' . e($paidOrder['order_no']) . ' <span class="meta">' . e(dt($paidOrder['paid_at'] ?: $paidOrder['created_at'])) . ' 결제</span></strong><small>' . e($paidOrder['item_names'] ?: '상품') . ' · ' . won($paidOrder['items_amount']) . '</small></span></label>';
+        $productLabel = compact_product_names((string)($paidOrder['item_names'] ?? ''));
+        $attrs = ' data-merge-label="' . e($productLabel) . '" data-merge-name="' . e($paidOrder['recipient_name']) . '" data-merge-phone="' . e($paidOrder['recipient_phone']) . '" data-merge-zipcode="' . e($paidOrder['zipcode']) . '" data-merge-address1="' . e($paidOrder['address1']) . '" data-merge-address2="' . e($paidOrder['address2']) . '"';
+        $mergeOptions .= '<label class="merge-option"><input type="radio" name="mergeOrderId" value="' . (int)$paidOrder['id'] . '"' . $attrs . ($index === 0 ? ' checked' : '') . '><span class="merge-option-body"><span class="merge-option-heading"><strong>' . e($productLabel) . '</strong><b class="num">' . won($paidOrder['items_amount']) . '</b></span><span class="merge-option-meta">' . e(dt($paidOrder['paid_at'] ?: $paidOrder['created_at'])) . ' 결제 완료</span><small>이 상품들과 한 택배로 발송 · 추가 배송비 없음</small></span></label>';
     }
-    $orderMerge = $mergeOptions !== '' ? '<div class="keep-merge order-merge-box" data-order-merge><p class="merge-title">발송 대기 중인 주문에 추가하기</p><p class="hint merge-hint">아직 발송 전인 주문과 한 택배로 보내드려요. 배송비가 다시 붙지 않고, 받는 분 정보는 그 주문과 같아요.</p>' . $mergeOptions . '<label class="check merge-option"><input type="radio" name="mergeOrderId" value="0"><span class="merge-option-body"><strong>따로 받기</strong><small>새 주문으로 배송비를 따로 계산해요</small></span></label></div>' : '';
-    $body = '<main class="wrap page"><div class="page-title"><h1>주문서</h1></div><div class="panel"><div data-co-lines></div><div class="summary"><div class="sum-row"><span>상품금액</span><span data-sum-items>-</span></div><div class="sum-row"><span>배송비</span><span data-sum-ship>-</span></div><div class="sum-row" data-sum-point-row hidden><span>포인트</span><span data-sum-point>-</span></div><div class="sum-row total"><span>결제금액</span><span data-sum-total>-</span></div></div><p class="hint" data-free-hint></p><form data-addr-form><h2>배송 정보</h2><p class="hint" data-merge-addr-hint hidden></p><label class="field"><span>받는 분</span><input name="name" value="' . e($user['name']) . '"></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '"></label><label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label><label class="field"><span>배송 메모</span><input name="memo"></label><label class="check"><input type="checkbox" name="saveAddress" checked> 다음에도 이 주소 사용</label><button type="button" class="btn sm" data-edit-addr hidden>주소 수정</button><h2>배송 방법</h2><div class="choices delivery-choices"><label class="choice"><input type="radio" name="delivery" value="direct" checked><span class="tile"><span class="t">바로배송</span><span class="d">8만 원 이상 무료 · 미만 4,000원</span></span></label><label class="choice"><input type="radio" name="delivery" value="keep"><span class="tile"><span class="t">킵(보관)</span><span class="d">배송비 없이 보관 · 나중에 함께 배송</span></span></label></div>' . $orderMerge . $keepMerge . '<h2>결제 수단</h2><label class="check"><input type="radio" name="payment" value="bank" checked> 계좌이체</label><label class="field payment-depositor"><span>입금자명 <em class="required-mark">필수</em></span><input name="depositorName" maxlength="50" autocomplete="name" required></label><div data-cash-receipt><h3>현금영수증</h3><label class="check"><input type="radio" name="cashReceiptType" value="none" checked> 신청 안 함</label><label class="check"><input type="radio" name="cashReceiptType" value="income"> 소득공제용</label><label class="check"><input type="radio" name="cashReceiptType" value="expense"> 지출증빙용</label><input name="cashReceiptValue" data-cash-receipt-value placeholder="휴대폰 번호 또는 사업자등록번호" hidden></div><h2>포인트</h2><p class="hint">' . $pointGuide . '</p><p class="hint">보유 포인트가 10,000P 이상이면 결제 시 10,000P 단위로 자동 사용됩니다.</p><p class="hint" data-point-hint></p><button type="button" class="btn big block pink" data-place-order>주문하기</button></form></div></main>';
+    $orderMerge = $mergeOptions !== '' ? '<fieldset class="order-merge-box" data-order-merge><legend>발송 대기 상품과 같이 받기</legend><p class="hint merge-hint">같이 받을 상품을 선택하면 한 택배로 보내드려요. 추가 배송비는 없고, 기존 배송지를 그대로 사용해요.</p><div class="merge-options">' . $mergeOptions . '<label class="merge-option merge-option-separate"><input type="radio" name="mergeOrderId" value="0"><span class="merge-option-body"><span class="merge-option-heading"><strong>이번 상품은 따로 받기</strong><b>배송비 별도</b></span><small>새 택배로 보내고 배송비를 다시 계산해요</small></span></label></div></fieldset>' : '';
+    $checkoutSummary = '<p class="hint checkout-total-hint" data-free-hint></p><div class="summary checkout-total"><div class="sum-row"><span>상품금액</span><span data-sum-items>-</span></div><div class="sum-row"><span>배송비</span><span data-sum-ship>-</span></div><div class="sum-row" data-sum-point-row hidden><span>포인트</span><span data-sum-point>-</span></div><div class="sum-row total"><span>결제금액</span><span data-sum-total>-</span></div></div>';
+    $body = '<main class="wrap page"><div class="page-title"><h1>주문서</h1></div><div class="panel"><div data-co-lines></div><form data-addr-form>' . $orderMerge . '<h2>배송 정보</h2><p class="hint" data-merge-addr-hint hidden></p><label class="field"><span>받는 분</span><input name="name" value="' . e($user['name']) . '"></label><label class="field"><span>휴대폰</span><input name="phone" value="' . e($user['phone']) . '"></label><label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label><label class="field"><span>배송 메모</span><input name="memo"></label><label class="check"><input type="checkbox" name="saveAddress" checked> 다음에도 이 주소 사용</label><button type="button" class="btn sm" data-edit-addr hidden>주소 수정</button><h2>배송 방법</h2><div class="choices delivery-choices"><label class="choice"><input type="radio" name="delivery" value="direct" checked><span class="tile"><span class="t">바로배송</span><span class="d">8만 원 이상 무료 · 미만 4,000원</span></span></label><label class="choice"><input type="radio" name="delivery" value="keep"><span class="tile"><span class="t">킵(보관)</span><span class="d">배송비 없이 보관 · 나중에 함께 배송</span></span></label></div>' . $keepMerge . '<h2>결제 수단</h2><label class="check"><input type="radio" name="payment" value="bank" checked> 계좌이체</label><label class="field payment-depositor"><span>입금자명 <em class="required-mark">필수</em></span><input name="depositorName" maxlength="50" autocomplete="name" required></label><div data-cash-receipt><h3>현금영수증</h3><label class="check"><input type="radio" name="cashReceiptType" value="none" checked> 신청 안 함</label><label class="check"><input type="radio" name="cashReceiptType" value="income"> 소득공제용</label><label class="check"><input type="radio" name="cashReceiptType" value="expense"> 지출증빙용</label><input name="cashReceiptValue" data-cash-receipt-value placeholder="휴대폰 번호 또는 사업자등록번호" hidden></div><h2>포인트</h2><p class="hint">' . $pointGuide . '</p><p class="hint">보유 포인트가 10,000P 이상이면 결제 시 10,000P 단위로 자동 사용됩니다.</p><p class="hint" data-point-hint></p>' . $checkoutSummary . '<button type="button" class="btn big block pink" data-place-order>주문하기</button></form></div></main>';
     $body = str_replace('<label class="field"><span>우편번호</span><input name="zipcode" value="' . e($user['zipcode']) . '"></label><label class="field"><span>주소</span><input name="address1" value="' . e($user['address1']) . '"><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소"></label>', '<label class="field"><span>주소</span><div class="field-row address-search-row"><input class="grow" name="zipcode" data-signup-zipcode value="' . e($user['zipcode']) . '" placeholder="우편번호" readonly required><button type="button" class="btn small ghost" data-address-search>주소 검색</button></div><input name="address1" data-signup-address value="' . e($user['address1']) . '" placeholder="주소 검색으로 입력" readonly required><input name="address2" value="' . e($user['address2']) . '" placeholder="상세주소" autocomplete="street-address"></label>', $body);
-    page('주문서', $body, false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1', '/static/js/checkout.js?v=php7']);
+    page('주문서', $body, false, ['https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js', '/static/js/signup.js?v=php1', '/static/js/checkout.js?v=php8']);
 }
 
 function render_order(string $orderNo): never
@@ -1320,18 +1322,19 @@ function handle_admin(string $path): never
         $productId = max(0, (int)($_GET['product_id'] ?? 0));
         $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? (string)$_GET['from'] : '';
         $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['to'] ?? '')) ? (string)$_GET['to'] : '';
-        $where = [];
+        // 합배송 추가 주문은 대표 주문 한 행에 합쳐서 보여 준다.
+        $where = ['o.merge_order_id IS NULL'];
         $params = [];
         if ($status !== 'all') {
-            $where[] = 'o.status=?';
+            $where[] = 'EXISTS (SELECT 1 FROM orders status_order WHERE (status_order.id=o.id OR status_order.merge_order_id=o.id) AND status_order.status=?)';
             $params[] = $status;
         }
         if ($search !== '') {
-            $where[] = '(o.order_no LIKE ? OR u.login_id LIKE ? OR u.name LIKE ? OR o.recipient_name LIKE ? OR o.youtube_nickname LIKE ? OR u.youtube_nickname LIKE ? OR o.depositor_name LIKE ?)';
+            $where[] = '(u.login_id LIKE ? OR u.name LIKE ? OR u.youtube_nickname LIKE ? OR EXISTS (SELECT 1 FROM orders search_order WHERE (search_order.id=o.id OR search_order.merge_order_id=o.id) AND (search_order.order_no LIKE ? OR search_order.recipient_name LIKE ? OR search_order.youtube_nickname LIKE ? OR search_order.depositor_name LIKE ?)))';
             for ($i = 0; $i < 7; $i++) $params[] = '%' . $search . '%';
         }
         if ($productId > 0) {
-            $where[] = 'EXISTS (SELECT 1 FROM order_items filter_items WHERE filter_items.order_id=o.id AND filter_items.product_id=?)';
+            $where[] = 'EXISTS (SELECT 1 FROM order_items filter_items JOIN orders filter_order ON filter_order.id=filter_items.order_id WHERE (filter_order.id=o.id OR filter_order.merge_order_id=o.id) AND filter_items.product_id=?)';
             $params[] = $productId;
         }
         if ($from !== '') {
@@ -1343,36 +1346,72 @@ function handle_admin(string $path): never
             $params[] = $to . ' 00:00:00';
         }
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
-        $stmt = db()->prepare("SELECT o.*, u.login_id, u.name AS user_name, u.youtube_nickname AS user_youtube_nickname, (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names, (SELECT p.order_no FROM orders p WHERE p.id=o.merge_order_id) AS merge_parent_no, (SELECT COUNT(*) FROM orders c WHERE c.merge_order_id=o.id AND c.status<>'cancelled') AS merged_child_count FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
+        $stmt = db()->prepare("SELECT o.*, u.login_id, u.name AS user_name, u.youtube_nickname AS user_youtube_nickname,
+            (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi JOIN orders item_order ON item_order.id=oi.order_id WHERE (item_order.id=o.id OR item_order.merge_order_id=o.id) AND item_order.status<>'cancelled') AS item_names,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_order_count,
+            (SELECT COALESCE(SUM(group_order.total_amount),0) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_total_amount,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='pending') AS group_pending_count,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='paid') AS group_paid_count,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='preparing') AS group_preparing_count,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='shipped') AS group_shipped_count,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='cancelled') AS group_cancelled_count,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled' AND group_order.admin_checked_at IS NULL) AS group_unchecked_count
+            FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
         $rows = '';
+        $printableCount = 0;
         foreach ($orders as $order) {
             $paymentLabel = $order['payment_method'] === 'card' ? '카드결제' : '계좌이체';
             $dateLabel = $order['paid_at'] ? '결제 ' . dt($order['paid_at']) : '주문 ' . dt($order['created_at']);
-            $cancelLabel = $order['status'] === 'cancelled' && $order['cancel_reason'] ? '<span class="table-sub">' . e($order['cancel_reason']) . '</span>' : '';
+            $groupCount = max(1, (int)$order['group_order_count']);
+            $pendingCount = (int)$order['group_pending_count'];
+            $groupStatus = $pendingCount > 0 ? 'pending' : ((int)$order['group_paid_count'] > 0 ? 'paid' : ((int)$order['group_preparing_count'] > 0 ? 'preparing' : ((int)$order['group_shipped_count'] > 0 ? 'shipped' : 'cancelled')));
+            $printable = $order['delivery_type'] === 'direct' && in_array($groupStatus, ['preparing', 'shipped'], true);
+            if ($printable) $printableCount++;
+            $cancelLabel = $groupStatus === 'cancelled' && $order['cancel_reason'] ? '<span class="table-sub">' . e($order['cancel_reason']) . '</span>' : '';
             $memberName = trim((string)($order['user_name'] ?: $order['login_id']));
             $youtubeName = trim((string)($order['youtube_nickname'] ?: $order['user_youtube_nickname']));
             $depositorName = trim((string)$order['depositor_name']);
             $memberCell = '<strong>회원 · ' . e($memberName ?: '-') . '</strong><span class="table-sub">유튜브 · ' . e($youtubeName ?: '-') . '</span><span class="table-sub">입금자 · ' . e($depositorName ?: '-') . '</span><span class="table-sub">상품 · ' . e($order['item_names'] ?: '상품 정보 없음') . '</span>';
-            if (!empty($order['merge_parent_no'])) $memberCell .= '<span class="table-sub merge-sub">합배송 · ' . e($order['merge_parent_no']) . ' 주문에 추가 (배송비 없음)</span>';
-            if ((int)$order['merged_child_count'] > 0) $memberCell .= '<span class="table-sub merge-sub">추가 주문 ' . (int)$order['merged_child_count'] . '건 합배송</span>';
-            if (empty($order['admin_checked_at']) && $order['status'] !== 'cancelled') $memberCell = '<span class="order-new-indicator"><i class="new-order-dot" aria-hidden="true"></i>신규 주문</span>' . $memberCell;
+            if ($groupCount > 1) $memberCell .= '<span class="table-sub merge-sub">묶음배송 ' . num($groupCount) . '건 · 한 배송 건으로 관리</span>';
+            if ((int)$order['group_unchecked_count'] > 0) $memberCell = '<span class="order-new-indicator"><i class="new-order-dot" aria-hidden="true"></i>신규 주문</span>' . $memberCell;
             $actionCell = '';
-            if ($order['status'] === 'pending' && $order['payment_method'] === 'bank') {
-                $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm ok" type="submit" name="action" value="confirm">' . (!empty($order['merge_parent_no']) ? '추가 주문 입금 확인' : '입금 완료') . '</button></form>';
-            } elseif ($order['status'] === 'cancelled') {
+            if ($pendingCount > 0 && $groupCount > 1) {
+                $actionCell = '<a class="btn sm ok" href="/admin/orders/' . (int)$order['id'] . '">입금 확인 ' . num($pendingCount) . '건</a>';
+            } elseif ($groupStatus === 'pending' && $order['payment_method'] === 'bank') {
+                $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm ok" type="submit" name="action" value="confirm">입금 완료</button></form>';
+            } elseif ($groupStatus === 'cancelled' && $groupCount === 1) {
                 $actionCell = '<form method="post" action="/admin/orders/' . (int)$order['id'] . '" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders"><button class="btn sm danger" type="submit" name="action" value="delete" data-confirm-dialog="' . e($order['order_no']) . ' 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 삭제</button></form>';
             }
-            $rows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a><span class="table-sub">' . e($paymentLabel) . '</span></td><td class="member-cell">' . $memberCell . '</td><td><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span>' . $cancelLabel . '</td><td class="amount">' . won($order['total_amount']) . '</td><td><span class="table-sub">' . e($dateLabel) . '</span>' . ($order['cancelled_at'] ? '<span class="table-sub">취소 ' . e(dt($order['cancelled_at'])) . '</span>' : '') . '</td><td>' . $actionCell . '</td></tr>';
+            if ($printable) {
+                $printLink = '<a class="btn sm soft" href="/admin/orders/labels?ids%5B%5D=' . (int)$order['id'] . '" target="_blank" rel="noopener">송장 출력</a>';
+                $actionCell = '<div class="table-actions">' . $actionCell . $printLink . '</div>';
+            }
+            $orderLabel = $groupCount > 1 ? '<span class="table-sub merge-sub">묶음배송 ' . num($groupCount) . '건</span>' : '<span class="table-sub">' . e($paymentLabel) . '</span>';
+            $selectCell = $printable ? '<label class="label-checkbox"><input type="checkbox" name="ids[]" value="' . (int)$order['id'] . '" form="labelPrintForm" data-check aria-label="' . e($order['order_no']) . ' 송장 선택"><span class="sr-only">' . e($order['order_no']) . ' 송장 선택</span></label>' : '<span class="label-unavailable" aria-label="송장 출력 준비 전">—</span>';
+            $rows .= '<tr><td class="check">' . $selectCell . '</td><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a>' . $orderLabel . '</td><td class="member-cell">' . $memberCell . '</td><td><span class="chip ' . e($groupStatus) . '">' . e(order_status_label(['status' => $groupStatus, 'payment_method' => $order['payment_method']])) . '</span>' . ($pendingCount > 0 && $groupCount > 1 ? '<span class="table-sub">입금 대기 ' . num($pendingCount) . '건 포함</span>' : '') . $cancelLabel . '</td><td class="amount">' . won($order['group_total_amount']) . '</td><td><span class="table-sub">' . e($dateLabel) . '</span>' . ($order['cancelled_at'] ? '<span class="table-sub">취소 ' . e(dt($order['cancelled_at'])) . '</span>' : '') . '</td><td>' . $actionCell . '</td></tr>';
         }
-        if ($rows === '') $rows = '<tr><td colspan="6" class="empty-cell">조건에 맞는 주문 기록이 없습니다.</td></tr>';
+        if ($rows === '') $rows = '<tr><td colspan="7" class="empty-cell">조건에 맞는 주문 기록이 없습니다.</td></tr>';
         $productOptions = '<option value="0">전체 상품</option>';
         foreach (product_rows(true) as $product) $productOptions .= '<option value="' . (int)$product['id'] . '" ' . ($productId === (int)$product['id'] ? 'selected' : '') . '>' . e($product['name']) . '</option>';
         $statusOptionsHtml = '';
         foreach ($statusOptions as $value => $label) $statusOptionsHtml .= '<option value="' . e($value) . '" ' . ($status === $value ? 'selected' : '') . '>' . e($label) . '</option>';
         $filterHtml = '<form class="card history-filters" method="get" action="/admin/orders"><div class="filter-title"><div><h2>판매 원장</h2><p>결제 완료·배송 완료·취소·반품 기록을 주문별로 보관합니다. 상세 화면에서 처리 이력과 취소를 확인할 수 있어요.</p></div><span class="chip paid">총 ' . num(count($orders)) . '건</span></div><div class="filter-grid order-filter-grid"><label class="field"><span>상태</span><select name="status">' . $statusOptionsHtml . '</select></label><label class="field"><span>상품</span><select name="product_id">' . $productOptions . '</select></label><label class="field"><span>검색</span><input type="search" name="q" value="' . e($search) . '" placeholder="주문번호·아이디·받는 분"></label><label class="field"><span>주문 시작일</span><input type="date" name="from" value="' . e($from) . '"></label><label class="field"><span>주문 종료일</span><input type="date" name="to" value="' . e($to) . '"></label><div class="filter-submit"><button class="btn pink">필터 적용</button><a class="btn ghost" href="/admin/orders">초기화</a></div></div></form>';
-        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . '<div class="table-wrap"><table class="orders-table"><thead><tr><th>주문번호</th><th>회원 · 유튜브 · 입금자 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th><th>처리</th></tr></thead><tbody>' . $rows . '</tbody></table></div>');
+        $bulkHelp = $printableCount > 0 ? '배송준비중·배송완료 주문만 선택됩니다. 묶음배송은 송장 1장으로 출력돼요.' : '배송준비중으로 변경한 주문이 생기면 여기서 송장을 선택할 수 있어요.';
+        $bulkPrint = '<div class="table-wrap"><table class="orders-table"><thead><tr><th class="check"><label class="label-checkbox"><input type="checkbox" data-check-all aria-label="출력 가능한 송장 전체 선택"' . ($printableCount ? '' : ' disabled') . '><span class="sr-only">출력 가능한 송장 전체 선택</span></label></th><th>주문번호</th><th>회원 · 유튜브 · 입금자 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th><th>처리</th></tr></thead><tbody>' . $rows . '</tbody></table></div><form id="labelPrintForm" method="get" action="/admin/orders/labels" target="_blank" data-label-print-form><input type="hidden" name="print" value="1"><div class="bulk label-bulk"><span class="sel" aria-live="polite"><b data-sel-count>0</b>건 선택</span><span class="bulk-help">' . e($bulkHelp) . '</span><button class="btn pink" type="submit" data-need-sel disabled>선택 송장 출력</button></div></form>';
+        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . $bulkPrint);
+    }
+
+    if ($path === '/admin/orders/labels') {
+        $rawIds = $_GET['ids'] ?? [];
+        if (!is_array($rawIds)) $rawIds = [$rawIds];
+        $ids = array_values(array_unique(array_filter(array_map('intval', $rawIds), static fn(int $value): bool => $value > 0)));
+        admin_order_labels(array_slice($ids, 0, 50));
+    }
+
+    if (preg_match('#^/admin/orders/(\d+)/label$#', $path, $match)) {
+        admin_order_label((int)$match[1]);
     }
 
     if (preg_match('#^/admin/orders/(\d+)$#', $path, $match)) {
@@ -1440,7 +1479,7 @@ function admin_users(): never
     }
 
     $stmt = $pdo->prepare("SELECT u.*,
-        (SELECT COUNT(*) FROM orders o WHERE o.user_id=u.id AND o.status<>'cancelled') AS order_count,
+        (SELECT COUNT(*) FROM orders o WHERE o.user_id=u.id AND o.merge_order_id IS NULL AND (o.status<>'cancelled' OR EXISTS (SELECT 1 FROM orders child WHERE child.merge_order_id=o.id AND child.status<>'cancelled'))) AS order_count,
         (SELECT COALESCE(SUM(o.total_amount),0) FROM orders o WHERE o.user_id=u.id AND o.status<>'cancelled') AS order_total
         FROM users u $where ORDER BY u.id DESC LIMIT 200");
     $stmt->execute($params);
@@ -1475,26 +1514,39 @@ function admin_user_detail(int $id): never
         admin_shell('회원 없음', '<div class="card"><h1>회원을 찾을 수 없습니다.</h1><p class="page-sub">삭제되었거나 잘못된 회원 번호입니다.</p><a class="btn ghost" href="/admin/users">회원 목록으로</a></div>');
     }
 
-    $summaryStmt = $pdo->prepare("SELECT COUNT(*) AS order_count, COALESCE(SUM(total_amount),0) AS order_total, COALESCE(SUM(point_used),0) AS points_used, COALESCE(SUM(point_earned),0) AS points_earned FROM orders WHERE user_id=? AND status<>'cancelled'");
+    $summaryStmt = $pdo->prepare("SELECT COUNT(DISTINCT CASE WHEN merge_order_id IS NULL THEN id ELSE merge_order_id END) AS order_count, COALESCE(SUM(total_amount),0) AS order_total, COALESCE(SUM(point_used),0) AS points_used, COALESCE(SUM(point_earned),0) AS points_earned FROM orders WHERE user_id=? AND status<>'cancelled'");
     $summaryStmt->execute([$id]);
     $summary = $summaryStmt->fetch() ?: ['order_count' => 0, 'order_total' => 0, 'points_used' => 0, 'points_earned' => 0];
     $keptStmt = $pdo->prepare("SELECT COALESCE(SUM(items_amount),0) FROM orders WHERE user_id=? AND status='kept' AND shipment_request_id IS NULL");
     $keptStmt->execute([$id]);
     $keptAmount = (int)$keptStmt->fetchColumn();
 
-    $ordersStmt = $pdo->prepare("SELECT o.*, (SELECT GROUP_CONCAT(CONCAT(oi.product_name, ' × ', oi.qty) ORDER BY oi.id SEPARATOR ', ') FROM order_items oi WHERE oi.order_id=o.id) AS item_names FROM orders o WHERE o.user_id=? ORDER BY o.id DESC LIMIT 50");
+    $ordersStmt = $pdo->prepare("SELECT o.*,
+        (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi JOIN orders item_order ON item_order.id=oi.order_id WHERE (item_order.id=o.id OR item_order.merge_order_id=o.id) AND item_order.status<>'cancelled') AS item_names,
+        (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_order_count,
+        (SELECT COALESCE(SUM(group_order.total_amount),0) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_total_amount,
+        (SELECT COALESCE(SUM(group_order.items_amount),0) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_items_amount,
+        (SELECT COALESCE(SUM(group_order.point_used),0) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_point_used,
+        (SELECT COALESCE(SUM(group_order.point_earned),0) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_point_earned,
+        (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='pending') AS group_pending_count,
+        (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='paid') AS group_paid_count,
+        (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='preparing') AS group_preparing_count,
+        (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='shipped') AS group_shipped_count
+        FROM orders o WHERE o.user_id=? AND o.merge_order_id IS NULL ORDER BY o.id DESC LIMIT 50");
     $ordersStmt->execute([$id]);
     $orders = $ordersStmt->fetchAll();
     $orderRows = '';
     foreach ($orders as $order) {
-        $paymentLabel = $order['payment_method'] === 'card' ? '카드결제' : '계좌이체';
+        $groupCount = max(1, (int)$order['group_order_count']);
+        $paymentLabel = $groupCount > 1 ? $groupCount . '건 개별 결제' : ($order['payment_method'] === 'card' ? '카드결제' : '계좌이체');
         $deliveryLabel = $order['delivery_type'] === 'keep' ? '킵 보관' : '바로배송';
         $itemNames = trim((string)$order['item_names']);
         if ($itemNames === '') $itemNames = '상품 정보 없음';
         $pointMeta = [];
-        if ((int)$order['point_used'] > 0) $pointMeta[] = '포인트 사용 ' . num($order['point_used']) . 'P';
-        if ((int)$order['point_earned'] > 0) $pointMeta[] = '적립 예정 ' . num($order['point_earned']) . 'P';
-        $orderRows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a><span class="table-sub">' . e(dt($order['created_at'])) . '</span></td><td class="member-order-items"><strong>' . e($itemNames) . '</strong>' . ($pointMeta ? '<span class="table-sub">' . e(implode(' · ', $pointMeta)) . '</span>' : '') . '</td><td class="member-order-meta"><span class="table-sub">' . e($paymentLabel) . '</span><span class="table-sub">' . e($deliveryLabel) . '</span></td><td class="right"><strong class="num">' . won($order['total_amount']) . '</strong><span class="table-sub">상품 ' . won($order['items_amount']) . '</span></td><td><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span></td></tr>';
+        if ((int)$order['group_point_used'] > 0) $pointMeta[] = '포인트 사용 ' . num($order['group_point_used']) . 'P';
+        if ((int)$order['group_point_earned'] > 0) $pointMeta[] = '적립 예정 ' . num($order['group_point_earned']) . 'P';
+        $groupStatus = (int)$order['group_pending_count'] > 0 ? 'pending' : ((int)$order['group_paid_count'] > 0 ? 'paid' : ((int)$order['group_preparing_count'] > 0 ? 'preparing' : ((int)$order['group_shipped_count'] > 0 ? 'shipped' : 'cancelled')));
+        $orderRows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a><span class="table-sub">' . ($groupCount > 1 ? '묶음배송 ' . num($groupCount) . '건' : e(dt($order['created_at']))) . '</span></td><td class="member-order-items"><strong>' . e($itemNames) . '</strong>' . ($pointMeta ? '<span class="table-sub">' . e(implode(' · ', $pointMeta)) . '</span>' : '') . '</td><td class="member-order-meta"><span class="table-sub">' . e($paymentLabel) . '</span><span class="table-sub">' . e($deliveryLabel) . '</span></td><td class="right"><strong class="num">' . won($order['group_total_amount']) . '</strong><span class="table-sub">상품 ' . won($order['group_items_amount']) . '</span></td><td><span class="chip ' . e($groupStatus) . '">' . e(order_status_label(['status' => $groupStatus, 'payment_method' => $order['payment_method']])) . '</span></td></tr>';
     }
     if ($orderRows === '') $orderRows = '<tr><td colspan="5" class="empty-cell">아직 주문한 상품이 없습니다.</td></tr>';
 
@@ -1828,9 +1880,217 @@ function admin_settings(): never
     }
     $s = setting_values();
     $checkbox = static fn(string $key): string => $s[$key] ? 'checked' : '';
-    $html = '<div class="page-head"><h1>사이트 설정</h1></div><form method="post" class="card"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><h2>고객 화면</h2><label><input type="checkbox" name="live_on" ' . $checkbox('live_on') . '> 방송 중</label><label><input type="checkbox" name="always_show_price" ' . $checkbox('always_show_price') . '> 방송 전에도 가격 표시</label><label><input type="checkbox" name="show_stock" ' . $checkbox('show_stock') . '> 고객에게 재고 수량 표시</label><label class="field"><span>공지 문구</span><textarea name="notice_text">' . e($s['notice_text']) . '</textarea></label><label class="field"><span>이벤트 문구</span><input name="event_notice_text" value="' . e($s['event_notice_text']) . '"></label><h2>배송</h2><label class="field"><span>무료배송 기준</span><input type="number" name="free_shipping_threshold" value="' . (int)$s['free_shipping_threshold'] . '"></label><label class="field"><span>배송비</span><input type="number" name="shipping_fee" value="' . (int)$s['shipping_fee'] . '"></label><h2>포인트</h2><label class="field"><span>적립 방식</span><select name="point_earn_mode"><option value="off" ' . ($s['point_earn_mode'] === 'off' ? 'selected' : '') . '>사용 안 함</option><option value="flat" ' . ($s['point_earn_mode'] === 'flat' ? 'selected' : '') . '>단일 비율</option><option value="tier" ' . ($s['point_earn_mode'] === 'tier' ? 'selected' : '') . '>라이브 합산 2단계</option></select></label><label class="field"><span>라이브 누적 30만원 미만 적립률</span><input name="point_earn_under_rate" type="number" step="0.1" value="' . e($s['point_earn_under_rate']) . '"></label><label class="field"><span>라이브 누적 30만원 이상 적립률</span><input name="point_earn_over_rate" type="number" step="0.1" value="' . e($s['point_earn_over_rate']) . '"></label><label class="field"><span>라이브 누적 기준 금액</span><input name="point_earn_threshold" type="number" value="' . e($s['point_earn_threshold']) . '"></label><label><input type="checkbox" name="point_use_enabled" ' . $checkbox('point_use_enabled') . '> 포인트 사용 허용</label><label class="field"><span>최소 보유 포인트</span><input name="point_min_balance" type="number" value="' . e($s['point_min_balance']) . '"></label><label class="field"><span>사용 단위</span><input name="point_use_unit" type="number" value="' . e($s['point_use_unit']) . '"></label><label class="field"><span>포인트 안내</span><textarea name="point_guide_text">' . e($s['point_guide_text']) . '</textarea></label><h2>현금영수증</h2><label><input type="checkbox" name="cash_receipt_enabled" ' . $checkbox('cash_receipt_enabled') . '> 신청 기능 사용</label><h2>사업자 정보</h2><label class="field"><span>상호</span><input name="biz_name" value="' . e($s['biz_name']) . '"></label><label class="field"><span>대표자</span><input name="biz_owner" value="' . e($s['biz_owner']) . '"></label><label class="field"><span>사업자등록번호</span><input name="biz_reg_no" value="' . e($s['biz_reg_no']) . '"></label><label class="field"><span>주소</span><input name="biz_address" value="' . e($s['biz_address']) . '"></label><label class="field"><span>전화</span><input name="biz_phone" value="' . e($s['biz_phone']) . '"></label><label class="field"><span>이메일</span><input name="biz_email" value="' . e($s['biz_email']) . '"></label><button class="btn pink">저장</button></form>';
+    $html = '<div class="page-head"><h1>사이트 설정</h1></div><form method="post" class="card"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><h2>고객 화면</h2><label><input type="checkbox" name="live_on" ' . $checkbox('live_on') . '> 방송 중</label><label><input type="checkbox" name="always_show_price" ' . $checkbox('always_show_price') . '> 방송 전에도 가격 표시</label><label><input type="checkbox" name="show_stock" ' . $checkbox('show_stock') . '> 고객에게 재고 수량 표시</label><label class="field"><span>공지 문구</span><textarea name="notice_text">' . e($s['notice_text']) . '</textarea></label><label class="field"><span>이벤트 문구</span><input name="event_notice_text" value="' . e($s['event_notice_text']) . '"></label><h2>배송</h2><label class="field"><span>무료배송 기준</span><input type="number" name="free_shipping_threshold" value="' . (int)$s['free_shipping_threshold'] . '"></label><label class="field"><span>배송비</span><input type="number" name="shipping_fee" value="' . (int)$s['shipping_fee'] . '"></label><h2>포인트</h2><label class="field"><span>적립 방식</span><select name="point_earn_mode"><option value="off" ' . ($s['point_earn_mode'] === 'off' ? 'selected' : '') . '>사용 안 함</option><option value="flat" ' . ($s['point_earn_mode'] === 'flat' ? 'selected' : '') . '>단일 비율</option><option value="tier" ' . ($s['point_earn_mode'] === 'tier' ? 'selected' : '') . '>라이브 합산 2단계</option></select></label><label class="field"><span>라이브 누적 30만원 미만 적립률</span><input name="point_earn_under_rate" type="number" step="0.1" value="' . e($s['point_earn_under_rate']) . '"></label><label class="field"><span>라이브 누적 30만원 이상 적립률</span><input name="point_earn_over_rate" type="number" step="0.1" value="' . e($s['point_earn_over_rate']) . '"></label><label class="field"><span>라이브 누적 기준 금액</span><input name="point_earn_threshold" type="number" value="' . e($s['point_earn_threshold']) . '"></label><label><input type="checkbox" name="point_use_enabled" ' . $checkbox('point_use_enabled') . '> 포인트 사용 허용</label><label class="field"><span>최소 보유 포인트</span><input name="point_min_balance" type="number" value="' . e($s['point_min_balance']) . '"></label><label class="field"><span>사용 단위</span><input name="point_use_unit" type="number" value="' . e($s['point_use_unit']) . '"></label><label class="field"><span>포인트 안내</span><textarea name="point_guide_text">' . e($s['point_guide_text']) . '</textarea></label><h2>현금영수증</h2><label><input type="checkbox" name="cash_receipt_enabled" ' . $checkbox('cash_receipt_enabled') . '> 신청 기능 사용</label><h2>카카오채널</h2><label class="field"><span>채널 URL</span><input type="url" name="kakao_channel_url" value="' . e($s['kakao_channel_url']) . '"></label><label class="field"><span>1:1 채팅 URL</span><input type="url" name="kakao_chat_url" value="' . e($s['kakao_chat_url']) . '"></label><h2>사업자 정보</h2><label class="field"><span>상호</span><input name="biz_name" value="' . e($s['biz_name']) . '"></label><label class="field"><span>대표자</span><input name="biz_owner" value="' . e($s['biz_owner']) . '"></label><label class="field"><span>사업자등록번호</span><input name="biz_reg_no" value="' . e($s['biz_reg_no']) . '"></label><label class="field"><span>주소</span><input name="biz_address" value="' . e($s['biz_address']) . '"></label><label class="field"><span>전화</span><input name="biz_phone" value="' . e($s['biz_phone']) . '"></label><label class="field"><span>이메일</span><input name="biz_email" value="' . e($s['biz_email']) . '"></label><button class="btn pink">저장</button></form>';
     $html = str_replace('<h2>배송</h2>', '<h2>입금 안내</h2><label class="field"><span>은행명</span><input name="bank_name" value="' . e($s['bank_name']) . '"></label><label class="field"><span>계좌번호</span><input name="bank_account" value="' . e($s['bank_account']) . '"></label><label class="field"><span>예금주</span><input name="bank_holder" value="' . e($s['bank_holder']) . '"></label><h2>배송</h2>', $html);
     admin_shell('사이트 설정', $html);
+}
+
+function admin_order_label(int $id): never
+{
+    $stmt = db()->prepare('SELECT o.*,u.login_id FROM orders o JOIN users u ON u.id=o.user_id WHERE o.id=?');
+    $stmt->execute([$id]);
+    $order = $stmt->fetch();
+    if (!$order) admin_shell('주문 없음', '<div class="card">주문을 찾을 수 없습니다.</div>');
+    if (!empty($order['merge_order_id'])) redirect_to('/admin/orders/' . (int)$order['merge_order_id'] . '/label' . (!empty($_GET['print']) ? '?print=1' : ''));
+
+    $groupOrders = merge_group_orders(db(), $order);
+    $activeGroupOrders = array_values(array_filter($groupOrders, static fn(array $member): bool => $member['status'] !== 'cancelled'));
+    $notReady = array_filter($activeGroupOrders, static fn(array $member): bool => !in_array($member['status'], ['preparing', 'shipped'], true));
+    if (!$activeGroupOrders || $notReady) {
+        admin_shell('송장 출력 불가', '<div class="page-head"><div><h1>송장 출력 준비가 필요합니다.</h1><p class="page-sub">모든 주문을 배송준비중으로 변경한 뒤 출력해 주세요.</p></div><a class="btn ghost" href="/admin/orders/' . $id . '">주문으로 돌아가기</a></div>');
+    }
+
+    $items = db()->prepare("SELECT oi.*, source_order.order_no AS source_order_no FROM order_items oi JOIN orders source_order ON source_order.id=oi.order_id WHERE (source_order.id=? OR source_order.merge_order_id=?) AND source_order.status<>'cancelled' ORDER BY source_order.id,oi.id");
+    $items->execute([$id, $id]);
+    $itemRows = '';
+    $itemCount = 0;
+    $totalQuantity = 0;
+    foreach ($items as $item) {
+        $itemCount++;
+        $quantity = (int)$item['qty'];
+        $totalQuantity += $quantity;
+        $packageLabel = $item['package_type'] === 'full' ? '풀박' : ($item['package_type'] === 'loose' ? '낱박' : '기본 구성');
+        $details = [$packageLabel];
+        if ((int)$item['qty_opened'] || (int)$item['qty_unopened']) {
+            $details[] = '라이브 개봉 ' . num($item['qty_opened']) . '개';
+            $details[] = '미개봉 발송 ' . num($item['qty_unopened']) . '개';
+        }
+        if (count($activeGroupOrders) > 1) $details[] = $item['source_order_no'];
+        $itemRows .= '<tr><td><strong>' . e($item['product_name']) . '</strong><small>' . e(implode(' · ', $details)) . '</small></td><td class="qty">' . num($quantity) . '</td></tr>';
+    }
+    if ($itemRows === '') $itemRows = '<tr><td colspan="2">상품 정보가 없습니다.</td></tr>';
+
+    $orderNumbers = array_map(static fn(array $member): string => (string)$member['order_no'], $activeGroupOrders);
+    $settings = setting_values();
+    $zipcode = trim((string)$order['zipcode']);
+    $recipientAddress = trim(($zipcode !== '' ? '(' . $zipcode . ') ' : '') . (string)$order['address1'] . ' ' . (string)$order['address2']);
+    $memo = trim((string)$order['memo']);
+    $memoHtml = $memo !== '' ? nl2br(e($memo)) : '배송 메모 없음';
+    $statusLabel = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'preparing')) > 0 ? '배송준비중' : '배송완료 · 재출력';
+    $documentTitle = '배송송장_' . implode('_', $orderNumbers);
+    $autoPrint = !empty($_GET['print']);
+    $printScript = $autoPrint ? "window.addEventListener('load',()=>setTimeout(()=>window.print(),300));" : '';
+    $backUrl = '/admin/orders/' . $id;
+    $orderNumberText = implode(' · ', $orderNumbers);
+    $printedAt = date('Y.m.d H:i');
+    $senderName = trim((string)$settings['biz_name']) ?: '깅모지';
+    $senderOwner = trim((string)$settings['biz_owner']);
+    $senderPhone = trim((string)$settings['biz_phone']);
+    $senderAddress = trim((string)$settings['biz_address']);
+
+    echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . e($documentTitle) . '</title><style>
+    :root{color-scheme:light;--ink:#171214;--muted:#6f6467;--line:#cfc7c9;--soft:#f7f3f2;--pink:#c95a73}
+    *{box-sizing:border-box}html,body{margin:0;background:#ece8e7;color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:14px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    button,a{font:inherit}.print-toolbar{position:sticky;top:0;z-index:2;display:flex;justify-content:center;align-items:center;gap:10px;padding:12px;background:rgba(23,18,20,.94);color:#fff}.print-toolbar p{margin:0 12px 0 0;color:#ddd;font-size:13px}.print-toolbar button,.print-toolbar a{min-height:44px;padding:0 18px;border:0;border-radius:999px;text-decoration:none;font-weight:800;cursor:pointer}.print-toolbar button{background:#f4a6b4;color:#211719}.print-toolbar a{display:inline-flex;align-items:center;background:#fff;color:#211719}.print-toolbar :focus-visible{outline:3px solid #fff;outline-offset:2px}
+    .sheet{width:210mm;min-height:297mm;margin:20px auto;padding:14mm;background:#fff;box-shadow:0 12px 36px rgba(45,30,34,.16)}
+    .doc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:7mm;border-bottom:1.5px solid var(--ink)}.doc-head h1{margin:0 0 2mm;font-size:28px;line-height:1.1;letter-spacing:-.04em}.doc-head p{margin:0;color:var(--muted)}.doc-status{flex:0 0 auto;padding:6px 11px;border-radius:99px;background:#edf6f1;color:#24734f;font-weight:800}
+    .recipient{padding:9mm 0 8mm;border-bottom:1px solid var(--line)}.label{display:block;margin-bottom:2mm;color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.12em}.recipient-name{display:flex;align-items:baseline;gap:4mm;flex-wrap:wrap;margin-bottom:3mm}.recipient-name strong{font-size:32px;line-height:1.1;letter-spacing:-.04em}.recipient-name span{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}.address{margin:0;font-size:21px;line-height:1.45;font-weight:800;letter-spacing:-.025em;overflow-wrap:anywhere}
+    .memo{margin:6mm 0;padding:5mm;border:1.5px solid var(--ink);border-radius:3mm}.memo strong{display:block;margin-bottom:2mm;font-size:12px}.memo p{margin:0;font-size:16px;font-weight:700;white-space:normal;overflow-wrap:anywhere}
+    .summary{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin:6mm 0}.summary>div{padding:4mm;background:var(--soft);border-radius:3mm}.summary span{display:block;color:var(--muted);font-size:11px;font-weight:700}.summary strong{display:block;margin-top:1mm;font-size:15px;overflow-wrap:anywhere}.summary .numbers{font-variant-numeric:tabular-nums}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm}caption{text-align:left;margin-bottom:3mm;font-size:17px;font-weight:900}th,td{padding:3.5mm;border-top:1px solid var(--line);vertical-align:top;text-align:left}th{color:var(--muted);font-size:11px}th:last-child,td.qty{width:24mm;text-align:center}.items strong{display:block;font-size:15px;overflow-wrap:anywhere}.items small{display:block;margin-top:1mm;color:var(--muted);font-size:11px}.qty{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums}
+    .sender{display:grid;grid-template-columns:25mm 1fr;gap:2mm 5mm;margin-top:8mm;padding-top:5mm;border-top:1.5px solid var(--ink);font-size:12px}.sender dt{color:var(--muted);font-weight:700}.sender dd{margin:0;font-weight:700;overflow-wrap:anywhere}.print-note{margin:6mm 0 0;color:var(--muted);font-size:10px;text-align:right}
+    @media(max-width:800px){.print-toolbar{position:static;flex-wrap:wrap}.print-toolbar p{width:100%;margin:0;text-align:center}.sheet{width:calc(100% - 20px);min-height:0;margin:10px;padding:24px}.recipient-name strong{font-size:27px}.recipient-name span,.address{font-size:18px}.summary{grid-template-columns:1fr}}
+    @page{size:A4 portrait;margin:0}@media print{html,body{width:210mm;min-height:297mm;background:#fff}.print-toolbar{display:none!important}.sheet{width:210mm;min-height:297mm;margin:0;padding:12mm 14mm;box-shadow:none}.doc-head,.recipient,.memo,.summary,.sender{break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}.print-note{margin-top:4mm}}
+    </style></head><body><div class="print-toolbar"><p>인쇄창의 대상에서 “PDF로 저장”을 선택하세요.</p><button type="button" id="printLabel">PDF 저장·인쇄</button><a href="' . e($backUrl) . '">주문으로 돌아가기</a></div><main class="sheet"><header class="doc-head"><div><h1>배송 송장</h1><p class="numbers">주문 ' . e($orderNumberText) . ' · ' . e($printedAt) . ' 출력</p></div><span class="doc-status">' . e($statusLabel) . '</span></header><section class="recipient" aria-labelledby="recipientTitle"><span class="label" id="recipientTitle">받는 분</span><div class="recipient-name"><strong>' . e($order['recipient_name']) . '</strong><span>' . e($order['recipient_phone']) . '</span></div><p class="address">' . e($recipientAddress) . '</p></section><section class="memo"><strong>배송 메모</strong><p>' . $memoHtml . '</p></section><section class="summary" aria-label="배송 요약"><div><span>주문번호</span><strong class="numbers">' . e($orderNumberText) . '</strong></div><div><span>상품 수량</span><strong class="numbers">' . num($itemCount) . '종 · 총 ' . num($totalQuantity) . '개</strong></div></section><table class="items"><caption>보낼 상품</caption><thead><tr><th scope="col">상품 · 포장 정보</th><th scope="col">수량</th></tr></thead><tbody>' . $itemRows . '</tbody></table><dl class="sender"><dt>보내는 분</dt><dd>' . e($senderName . ($senderOwner !== '' ? ' · ' . $senderOwner : '')) . '</dd><dt>연락처</dt><dd>' . e($senderPhone ?: '-') . '</dd><dt>주소</dt><dd>' . e($senderAddress ?: '-') . '</dd><dt>택배 정보</dt><dd>택배사 ____________________ &nbsp; 송장번호 ____________________</dd></dl><p class="print-note">택배사 바코드 운송장은 택배 접수 후 별도로 부착합니다.</p></main><script>document.getElementById("printLabel").addEventListener("click",()=>window.print());' . $printScript . '</script></body></html>';
+    exit;
+}
+
+function admin_order_label_data(int $requestedId): array
+{
+    $pdo = db();
+    $stmt = $pdo->prepare('SELECT o.*,u.login_id FROM orders o JOIN users u ON u.id=o.user_id WHERE o.id=?');
+    $stmt->execute([$requestedId]);
+    $order = $stmt->fetch();
+    if (!$order) throw new RuntimeException('주문을 찾을 수 없습니다.');
+
+    $rootId = (int)($order['merge_order_id'] ?: $order['id']);
+    if ($rootId !== (int)$order['id']) {
+        $stmt->execute([$rootId]);
+        $order = $stmt->fetch();
+        if (!$order) throw new RuntimeException('대표 주문을 찾을 수 없습니다.');
+    }
+
+    $groupOrders = merge_group_orders($pdo, $order);
+    $activeGroupOrders = array_values(array_filter($groupOrders, static fn(array $member): bool => $member['status'] !== 'cancelled'));
+    $notReady = array_filter($activeGroupOrders, static fn(array $member): bool => !in_array($member['status'], ['preparing', 'shipped'], true));
+    if ($order['delivery_type'] !== 'direct' || !$activeGroupOrders || $notReady) {
+        throw new RuntimeException('바로배송 주문을 모두 배송준비중으로 변경한 뒤 출력해 주세요.');
+    }
+
+    $itemStmt = $pdo->prepare("SELECT oi.*, source_order.order_no AS source_order_no FROM order_items oi JOIN orders source_order ON source_order.id=oi.order_id WHERE (source_order.id=? OR source_order.merge_order_id=?) AND source_order.status<>'cancelled' ORDER BY source_order.id,oi.id");
+    $itemStmt->execute([$rootId, $rootId]);
+    $items = [];
+    $totalQuantity = 0;
+    foreach ($itemStmt as $item) {
+        $quantity = (int)$item['qty'];
+        $totalQuantity += $quantity;
+        $packageLabel = $item['package_type'] === 'full' ? '풀박' : ($item['package_type'] === 'loose' ? '낱박' : '기본 구성');
+        $details = [$packageLabel];
+        if ((int)$item['qty_opened'] || (int)$item['qty_unopened']) {
+            $details[] = '라이브 개봉 ' . num($item['qty_opened']) . '개';
+            $details[] = '미개봉 발송 ' . num($item['qty_unopened']) . '개';
+        }
+        if (count($activeGroupOrders) > 1) $details[] = (string)$item['source_order_no'];
+        $items[] = ['name' => (string)$item['product_name'], 'details' => $details, 'qty' => $quantity];
+    }
+
+    $memos = [];
+    foreach ($activeGroupOrders as $member) {
+        $memo = trim((string)$member['memo']);
+        if ($memo !== '' && !in_array($memo, $memos, true)) $memos[] = $memo;
+    }
+    $zipcode = trim((string)$order['zipcode']);
+
+    return [
+        'root_id' => $rootId,
+        'order_numbers' => array_map(static fn(array $member): string => (string)$member['order_no'], $activeGroupOrders),
+        'recipient_name' => (string)$order['recipient_name'],
+        'recipient_phone' => (string)$order['recipient_phone'],
+        'recipient_address' => trim(($zipcode !== '' ? '(' . $zipcode . ') ' : '') . (string)$order['address1'] . ' ' . (string)$order['address2']),
+        'memos' => $memos,
+        'items' => $items,
+        'total_quantity' => $totalQuantity,
+        'status_label' => count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'preparing')) > 0 ? '배송준비중' : '배송완료 · 재출력',
+        'courier' => trim((string)($order['courier'] ?? '')),
+        'tracking_no' => trim((string)($order['tracking_no'] ?? '')),
+    ];
+}
+
+function admin_order_label_sheet(array $label, int $page, int $total, array $settings): string
+{
+    $itemRows = '';
+    foreach ($label['items'] as $item) {
+        $itemRows .= '<tr><td><strong>' . e($item['name']) . '</strong><small>' . e(implode(' · ', $item['details'])) . '</small></td><td class="qty">' . num($item['qty']) . '</td></tr>';
+    }
+    if ($itemRows === '') $itemRows = '<tr><td colspan="2">상품 정보가 없습니다.</td></tr>';
+
+    $memoHtml = $label['memos'] ? implode('<br>', array_map('e', $label['memos'])) : '배송 메모 없음';
+    $orderNumberText = implode(' · ', $label['order_numbers']);
+    $senderName = trim((string)$settings['biz_name']) ?: '깅모지';
+    $senderOwner = trim((string)$settings['biz_owner']);
+    $senderPhone = trim((string)$settings['biz_phone']);
+    $senderAddress = trim((string)$settings['biz_address']);
+    $tracking = $label['courier'] !== '' || $label['tracking_no'] !== ''
+        ? e(trim($label['courier'] . ' ' . $label['tracking_no']))
+        : '<span>택배사 ____________________</span><span>송장번호 ____________________</span>';
+
+    return '<main class="sheet"><header class="doc-head"><div><h1>배송 송장</h1><p class="numbers">주문 ' . e($orderNumberText) . ' · ' . e(date('Y.m.d H:i')) . ' 출력</p></div><div class="doc-badges"><span class="doc-page">' . num($page) . ' / ' . num($total) . '</span><span class="doc-status">' . e($label['status_label']) . '</span></div></header><section class="recipient" aria-label="받는 분"><span class="label">받는 분</span><div class="recipient-name"><strong>' . e($label['recipient_name']) . '</strong><span>' . e($label['recipient_phone']) . '</span></div><p class="address">' . e($label['recipient_address']) . '</p></section><section class="memo"><strong>배송 메모</strong><p>' . $memoHtml . '</p></section><section class="summary" aria-label="배송 요약"><div><span>주문번호</span><strong class="numbers">' . e($orderNumberText) . '</strong></div><div><span>상품 수량</span><strong class="numbers">' . num(count($label['items'])) . '종 · 총 ' . num($label['total_quantity']) . '개</strong></div></section><table class="items"><caption>보낼 상품</caption><thead><tr><th scope="col">상품 · 포장 정보</th><th scope="col">수량</th></tr></thead><tbody>' . $itemRows . '</tbody></table><dl class="sender"><dt>보내는 분</dt><dd>' . e($senderName . ($senderOwner !== '' ? ' · ' . $senderOwner : '')) . '</dd><dt>연락처</dt><dd>' . e($senderPhone ?: '-') . '</dd><dt>주소</dt><dd>' . e($senderAddress ?: '-') . '</dd><dt>택배 정보</dt><dd class="tracking-fields">' . $tracking . '</dd></dl><p class="print-note">택배사 바코드 운송장은 택배 접수 후 별도로 부착합니다.</p></main>';
+}
+
+function admin_order_label_styles(): string
+{
+    return <<<'CSS'
+:root{color-scheme:light;--ink:#171214;--muted:#6f6467;--line:#cfc7c9;--soft:#f7f3f2;--pink:#c95a73}
+*{box-sizing:border-box}html,body{margin:0;background:#ece8e7;color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:14px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+button,a{font:inherit}.print-toolbar{position:sticky;top:0;z-index:2;display:flex;justify-content:center;align-items:center;gap:10px;padding:12px;background:rgba(23,18,20,.94);color:#fff}.print-toolbar p{margin:0 12px 0 0;color:#ddd;font-size:13px}.print-toolbar button,.print-toolbar a{min-height:44px;padding:0 18px;border:0;border-radius:999px;text-decoration:none;font-weight:800;cursor:pointer}.print-toolbar button{background:#f4a6b4;color:#211719}.print-toolbar a{display:inline-flex;align-items:center;background:#fff;color:#211719}.print-toolbar :focus-visible{outline:3px solid #fff;outline-offset:2px}
+.sheet{width:210mm;min-height:297mm;margin:20px auto;padding:14mm;background:#fff;box-shadow:0 12px 36px rgba(45,30,34,.16)}
+.doc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:7mm;border-bottom:1.5px solid var(--ink)}.doc-head h1{margin:0 0 2mm;font-size:28px;line-height:1.1;letter-spacing:-.04em;text-wrap:balance}.doc-head p{margin:0;color:var(--muted);overflow-wrap:anywhere}.doc-badges{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}.doc-page,.doc-status{flex:0 0 auto;padding:6px 11px;border-radius:99px;font-weight:800}.doc-page{background:var(--soft);color:var(--muted)}.doc-status{background:#edf6f1;color:#24734f}
+.recipient{padding:9mm 0 8mm;border-bottom:1px solid var(--line)}.label{display:block;margin-bottom:2mm;color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.12em}.recipient-name{display:flex;align-items:baseline;gap:4mm;flex-wrap:wrap;margin-bottom:3mm}.recipient-name strong{font-size:32px;line-height:1.1;letter-spacing:-.04em}.recipient-name span{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}.address{margin:0;font-size:21px;line-height:1.45;font-weight:800;letter-spacing:-.025em;overflow-wrap:anywhere}
+.memo{margin:6mm 0;padding:5mm;border:1.5px solid var(--ink);border-radius:3mm}.memo strong{display:block;margin-bottom:2mm;font-size:12px}.memo p{margin:0;font-size:16px;font-weight:700;white-space:normal;overflow-wrap:anywhere}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin:6mm 0}.summary>div{padding:4mm;background:var(--soft);border-radius:3mm}.summary span{display:block;color:var(--muted);font-size:11px;font-weight:700}.summary strong{display:block;margin-top:1mm;font-size:15px;overflow-wrap:anywhere}.summary .numbers{font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4mm}caption{text-align:left;margin-bottom:3mm;font-size:17px;font-weight:900}th,td{padding:3.5mm;border-top:1px solid var(--line);vertical-align:top;text-align:left}th{color:var(--muted);font-size:11px}th:last-child,td.qty{width:24mm;text-align:center}.items strong{display:block;font-size:15px;overflow-wrap:anywhere}.items small{display:block;margin-top:1mm;color:var(--muted);font-size:11px}.qty{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums}
+.sender{display:grid;grid-template-columns:25mm 1fr;gap:2mm 5mm;margin-top:8mm;padding-top:5mm;border-top:1.5px solid var(--ink);font-size:12px}.sender dt{color:var(--muted);font-weight:700}.sender dd{margin:0;font-weight:700;overflow-wrap:anywhere}.tracking-fields{display:flex;flex-wrap:wrap;gap:2mm 5mm}.tracking-fields span{white-space:nowrap}.print-note{margin:6mm 0 0;color:var(--muted);font-size:10px;text-align:right}
+@media(max-width:800px){.print-toolbar{position:static;flex-wrap:wrap}.print-toolbar p{width:100%;margin:0;text-align:center}.sheet{width:calc(100% - 20px);min-height:0;margin:10px;padding:24px}.recipient-name strong{font-size:27px}.recipient-name span,.address{font-size:18px}.summary{grid-template-columns:1fr}.doc-badges{max-width:130px}}
+@page{size:A4 portrait;margin:0}@media print{html,body{width:210mm;background:#fff}.print-toolbar{display:none!important}.sheet{width:210mm;min-height:297mm;margin:0;padding:12mm 14mm;box-shadow:none;break-after:page}.sheet:last-of-type{break-after:auto}.doc-head,.recipient,.memo,.summary,.sender{break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}.print-note{margin-top:4mm}}
+CSS;
+}
+
+function admin_order_labels(array $ids): never
+{
+    if (!$ids) {
+        admin_shell('송장 선택 필요', '<div class="page-head"><div><h1>출력할 송장을 선택해 주세요.</h1><p class="page-sub">주문 관리에서 배송준비중 또는 배송완료 주문을 선택할 수 있습니다.</p></div><a class="btn ghost" href="/admin/orders">주문 관리로 돌아가기</a></div>');
+    }
+
+    $labels = [];
+    $seen = [];
+    try {
+        foreach ($ids as $id) {
+            $label = admin_order_label_data((int)$id);
+            if (isset($seen[$label['root_id']])) continue;
+            $seen[$label['root_id']] = true;
+            $labels[] = $label;
+        }
+    } catch (RuntimeException $error) {
+        admin_shell('송장 출력 불가', '<div class="page-head"><div><h1>선택한 주문을 출력할 수 없습니다.</h1><p class="page-sub">' . e($error->getMessage()) . '</p></div><a class="btn ghost" href="/admin/orders">주문 관리로 돌아가기</a></div>');
+    }
+    if (!$labels) {
+        admin_shell('송장 없음', '<div class="page-head"><div><h1>출력할 수 있는 송장이 없습니다.</h1><p class="page-sub">주문 상태를 확인한 뒤 다시 선택해 주세요.</p></div><a class="btn ghost" href="/admin/orders">주문 관리로 돌아가기</a></div>');
+    }
+
+    $settings = setting_values();
+    $total = count($labels);
+    $sheets = '';
+    $orderNumbers = [];
+    foreach ($labels as $index => $label) {
+        $sheets .= admin_order_label_sheet($label, $index + 1, $total, $settings);
+        $orderNumbers = array_merge($orderNumbers, $label['order_numbers']);
+    }
+    $title = $total === 1 ? '배송송장_' . implode('_', $orderNumbers) : '배송송장_' . date('Ymd') . '_' . $total . '건';
+    $autoPrint = !empty($_GET['print']);
+    $printScript = $autoPrint ? "window.addEventListener('load',()=>setTimeout(()=>window.print(),300));" : '';
+
+    echo '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>' . e($title) . '</title><style>' . admin_order_label_styles() . '</style></head><body><div class="print-toolbar"><p>송장 ' . num($total) . '장을 A4 용지마다 1장씩 출력합니다.</p><button type="button" id="printLabels">PDF 저장·인쇄</button><a href="/admin/orders">주문 관리로 돌아가기</a></div>' . $sheets . '<script>document.getElementById("printLabels").addEventListener("click",()=>window.print());' . $printScript . '</script></body></html>';
+    exit;
 }
 
 function admin_order(int $id): never
@@ -1842,74 +2102,87 @@ function admin_order(int $id): never
     $stmt->execute([$id]);
     $order = $stmt->fetch();
     if (!$order) admin_shell('주문 없음', '<div class="card">주문을 찾을 수 없습니다.</div>');
-    if (empty($order['admin_checked_at'])) {
-        db()->prepare('UPDATE orders SET admin_checked_at=NOW() WHERE id=? AND admin_checked_at IS NULL')->execute([$id]);
-    }
-    $items = db()->prepare('SELECT * FROM order_items WHERE order_id=?');
-    $items->execute([$id]);
+    if (!empty($order['merge_order_id'])) redirect_to('/admin/orders/' . (int)$order['merge_order_id']);
+    $groupOrders = merge_group_orders(db(), $order);
+    $activeGroupOrders = array_values(array_filter($groupOrders, static fn(array $member): bool => $member['status'] !== 'cancelled'));
+    $activeGroupCount = count($activeGroupOrders);
+    $pendingGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'pending'));
+    $paidGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'paid'));
+    $preparingGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'preparing'));
+    $shippedGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'shipped'));
+    $groupStatus = $pendingGroupCount > 0 ? 'pending' : ($paidGroupCount > 0 ? 'paid' : ($preparingGroupCount > 0 ? 'preparing' : ($shippedGroupCount > 0 ? 'shipped' : 'cancelled')));
+    $groupItemsAmount = array_sum(array_map(static fn(array $member): int => (int)$member['items_amount'], $activeGroupOrders));
+    $groupShippingFee = array_sum(array_map(static fn(array $member): int => (int)$member['shipping_fee'], $activeGroupOrders));
+    $groupPointUsed = array_sum(array_map(static fn(array $member): int => (int)$member['point_used'], $activeGroupOrders));
+    $groupTotalAmount = array_sum(array_map(static fn(array $member): int => (int)$member['total_amount'], $activeGroupOrders));
+    db()->prepare('UPDATE orders SET admin_checked_at=COALESCE(admin_checked_at,NOW()) WHERE id=? OR merge_order_id=?')->execute([$id, $id]);
+    $items = db()->prepare("SELECT oi.*, source_order.id AS source_order_id FROM order_items oi JOIN orders source_order ON source_order.id=oi.order_id WHERE (source_order.id=? OR source_order.merge_order_id=?) AND source_order.status<>'cancelled' ORDER BY source_order.id,oi.id");
+    $items->execute([$id, $id]);
     $list = '';
     $itemCount = 0;
+    $productNames = [];
     foreach ($items as $item) {
         $itemCount++;
+        $productNames[] = (string)$item['product_name'];
         $packageLabel = $item['package_type'] === 'full' ? '풀박' : ($item['package_type'] === 'loose' ? '낱박' : '기본 구성');
         $split = ((int)$item['qty_opened'] || (int)$item['qty_unopened']) ? ' · 라이브 개봉 ' . (int)$item['qty_opened'] . '개 · 미개봉 발송 ' . (int)$item['qty_unopened'] . '개' : '';
-        $list .= '<div class="order-item"><div><strong>' . e($item['product_name']) . '</strong><span>' . e($packageLabel) . $split . ' · 수량 ' . num($item['qty']) . '</span></div><b class="num">' . won($item['line_amount']) . '</b></div>';
+        $sourceLabel = $activeGroupCount > 1 ? ' · ' . ((int)$item['source_order_id'] === $id ? '첫 결제' : '추가 결제') : '';
+        $list .= '<div class="order-item"><div><strong>' . e($item['product_name']) . '</strong><span>' . e($packageLabel) . $split . ' · 수량 ' . num($item['qty']) . $sourceLabel . '</span></div><b class="num">' . won($item['line_amount']) . '</b></div>';
     }
-    $eventStmt = db()->prepare('SELECT * FROM order_events WHERE order_id=? ORDER BY id DESC');
-    $eventStmt->execute([$id]);
+    $eventStmt = db()->prepare('SELECT event.*, source_order.payment_method AS source_payment_method, source_order.id AS source_order_id FROM order_events event JOIN orders source_order ON source_order.id=event.order_id WHERE source_order.id=? OR source_order.merge_order_id=? ORDER BY event.id DESC');
+    $eventStmt->execute([$id, $id]);
     $history = '';
     $eventCount = 0;
     foreach ($eventStmt as $event) {
         $eventCount++;
-        $toLabel = $event['to_status'] ? order_status_label(['status' => $event['to_status'], 'payment_method' => $order['payment_method']]) : '';
-        $transition = $event['from_status'] && $event['to_status'] ? '<span class="history-transition">' . e(order_status_label(['status' => $event['from_status'], 'payment_method' => $order['payment_method']])) . ' → ' . e($toLabel) . '</span>' : ($toLabel ? '<span class="history-transition">' . e($toLabel) . '</span>' : '');
+        $eventPayment = (string)$event['source_payment_method'];
+        $toLabel = $event['to_status'] ? order_status_label(['status' => $event['to_status'], 'payment_method' => $eventPayment]) : '';
+        $transition = $event['from_status'] && $event['to_status'] ? '<span class="history-transition">' . e(order_status_label(['status' => $event['from_status'], 'payment_method' => $eventPayment])) . ' → ' . e($toLabel) . '</span>' : ($toLabel ? '<span class="history-transition">' . e($toLabel) . '</span>' : '');
         $refund = (int)$event['refund_amount'] > 0 ? '<span class="history-refund">환불 대상 ' . won($event['refund_amount']) . '</span>' : '';
-        $history .= '<li class="history-item"><div class="history-dot"></div><div class="history-body"><div class="history-top"><strong>' . e(order_event_label($event)) . '</strong><time>' . e(dt($event['created_at'])) . '</time></div><p>' . e($event['memo'] ?: '처리 기록이 저장되었습니다.') . '</p><div class="history-meta">' . $transition . $refund . '</div></div></li>';
+        $eventSource = $activeGroupCount > 1 ? '<span class="history-source">' . ((int)$event['source_order_id'] === $id ? '첫 결제' : '추가 결제') . '</span>' : '';
+        $history .= '<li class="history-item"><div class="history-dot"></div><div class="history-body"><div class="history-top"><strong>' . e(order_event_label($event)) . '</strong><time>' . e(dt($event['created_at'])) . '</time></div><p>' . e($event['memo'] ?: '처리 기록이 저장되었습니다.') . '</p><div class="history-meta">' . $eventSource . $transition . $refund . '</div></div></li>';
     }
     if ($history === '') $history = '<li class="empty">아직 처리 이력이 없습니다.</li>';
     $deliveryInfo = $order['delivery_type'] === 'keep' ? '킵(보관)' : '바로배송';
     $deliveryClass = $order['delivery_type'] === 'keep' ? 'keep' : 'direct';
     $mergeNotice = !empty($order['keep_merge_requested']) ? '기존 킵 ' . won($order['keep_merge_amount']) . ' 같이 배송' : '';
     $mergeLinks = '';
-    $groupOrders = merge_group_orders(db(), $order);
-    $activeGroupOrders = array_values(array_filter($groupOrders, static fn(array $member): bool => $member['status'] !== 'cancelled'));
-    $activeGroupCount = count($activeGroupOrders);
-    $pendingGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'pending'));
-    $paidGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'paid'));
     if (count($groupOrders) > 1) {
         $memberRows = '';
         foreach ($groupOrders as $member) {
-            if ((int)$member['id'] === (int)$order['id']) continue;
-            $isRoot = empty($member['merge_order_id']);
             $warn = '';
-            if ($member['status'] === 'pending') $warn = ' <span class="warn">입금 대기 · 확인 후 함께 발송</span>';
-            elseif ($isRoot && in_array($member['status'], ['shipped', 'cancelled'], true) && in_array($order['status'], ['pending', 'paid', 'preparing'], true)) $warn = ' <span class="warn">대표 주문이 이미 ' . e(order_status_label($member)) . ' · 이 주문은 배송비 없이 단독 발송되니 확인 필요</span>';
+            if ($member['status'] === 'pending') $warn = '<span class="warn">입금 확인 후 함께 발송</span>';
             $quickConfirm = '';
             if ($member['status'] === 'pending' && $member['payment_method'] === 'bank') {
-                $quickConfirm = '<form method="post" action="/admin/orders/' . (int)$member['id'] . '" class="merge-quick-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders/' . (int)$order['id'] . '"><button class="btn sm ok" type="submit" name="action" value="confirm">입금 확인</button></form>';
+                $quickConfirm = '<form method="post" action="/admin/orders/' . (int)$member['id'] . '" class="merge-quick-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="return_to" value="/admin/orders/' . $id . '"><button class="btn sm ok" type="submit" name="action" value="confirm">입금 확인</button></form>';
             }
-            $memberRows .= '<div class="merge-member"><span>' . ($isRoot ? '대표 주문' : '추가 주문') . ' <a href="/admin/orders/' . (int)$member['id'] . '">' . e($member['order_no']) . '</a> · ' . e(order_status_label($member)) . ' · ' . won($member['total_amount']) . $warn . '</span>' . $quickConfirm . '</div>';
+            $memberRows .= '<div class="merge-member"><span><strong>' . e(compact_product_names((string)($member['item_names'] ?? ''))) . '</strong><small>' . (empty($member['merge_order_id']) ? '첫 결제' : '추가 결제') . ' · ' . e(order_status_label($member)) . ' · ' . won($member['total_amount']) . '</small>' . $warn . '</span>' . $quickConfirm . '</div>';
         }
-        $mergeRole = empty($order['merge_order_id']) ? '대표 주문' : '추가 주문 · 배송비 없음';
-        $mergeLinks = '<div class="order-merge-links"><strong>합배송 ' . num($activeGroupCount) . '건 · ' . $mergeRole . '</strong>' . $memberRows . '<span class="muted">모든 추가 주문의 입금 확인이 끝나면 묶음 전체를 한 번에 배송 처리해요.</span></div>';
+        $mergeLinks = '<div class="order-merge-links"><div class="merge-group-title"><strong>묶음배송 ' . num($activeGroupCount) . '건</strong><b class="num">' . won($groupTotalAmount) . '</b></div>' . $memberRows . '<span class="muted">관리자 주문 원장에서는 한 건으로 표시되고, 배송 상태도 함께 처리됩니다.</span></div>';
     }
     $actionButtons = '';
-    if ($order['status'] === 'pending') $actionButtons .= '<button class="btn pink" name="action" value="confirm">입금 확인 · 결제 완료</button>';
+    if ($order['status'] === 'pending' && $activeGroupCount === 1) $actionButtons .= '<button class="btn pink" name="action" value="confirm">입금 확인 · 결제 완료</button>';
     if ($order['status'] === 'paid') {
         if ($activeGroupCount > 1 && $pendingGroupCount > 0) $actionButtons .= '<button class="btn pink" type="button" disabled>입금대기 ' . num($pendingGroupCount) . '건 확인 후 배송 준비</button>';
         else $actionButtons .= '<button class="btn pink" name="action" value="prepare">' . ($activeGroupCount > 1 ? '합배송 ' . num($activeGroupCount) . '건 배송 준비' : '배송 준비중으로 변경') . '</button>';
     }
     if ($order['status'] === 'preparing') {
         if ($pendingGroupCount > 0 || $paidGroupCount > 0) $actionButtons .= '<button class="btn pink" type="button" disabled>묶음 주문 상태 확인 후 배송 완료</button>';
-        else $actionButtons .= '<button class="btn pink" name="action" value="ship">' . ($activeGroupCount > 1 ? '합배송 ' . num($activeGroupCount) . '건 배송 완료' : '배송 완료 처리') . '</button>';
+        else {
+            $actionButtons .= '<a class="btn soft" href="/admin/orders/labels?ids%5B%5D=' . $id . '&amp;print=1" target="_blank" rel="noopener">송장 PDF 출력</a>';
+            $actionButtons .= '<button class="btn pink" name="action" value="ship">' . ($activeGroupCount > 1 ? '합배송 ' . num($activeGroupCount) . '건 배송 완료' : '배송 완료 처리') . '</button>';
+        }
     }
     if ($order['status'] !== 'cancelled' && $order['status'] === 'shipped') $actionButtons .= '<input type="hidden" name="cancel_kind" value="return"><button class="btn danger" name="action" value="cancel">반품 · 환불 처리</button>';
     if ($order['status'] !== 'cancelled' && $order['status'] !== 'shipped') $actionButtons .= '<label class="action-select"><span>취소 유형</span><select name="cancel_kind"><option value="cancel">주문 취소 · 환불</option><option value="return">반품 · 환불</option></select></label><button class="btn danger" name="action" value="cancel">취소 처리</button>';
     if ($order['status'] === 'cancelled') $actionButtons .= '<button class="btn danger" name="action" value="delete" data-confirm-dialog="' . e($order['order_no']) . ' 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 자체 삭제</button>';
     if ($actionButtons === '') $actionButtons = '<span class="hint">추가로 처리할 작업이 없습니다.</span>';
     $receiptLabel = $order['cash_receipt_type'] === 'income' ? '소득공제용' : ($order['cash_receipt_type'] === 'expense' ? '지출증빙용' : '신청 안 함');
-    $actionHelp = $activeGroupCount > 1 ? '합배송 주문은 모든 입금 확인이 끝난 뒤 묶음 전체가 함께 배송 준비·완료 처리됩니다.' : '계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.';
-    $html = '<div class="page-head"><div><h1>주문 ' . e($order['order_no']) . '</h1><p class="page-sub">결제부터 배송 완료, 취소·반품까지 한 건의 판매 기록으로 관리합니다.</p></div><a class="btn ghost" href="/admin/orders">주문 원장</a></div><div class="order-layout"><div class="order-main"><section class="card order-card"><div class="order-card-heading"><h2>주문 상품</h2><span class="muted">' . num($itemCount) . '개 상품</span></div><div class="order-items-list">' . ($list ?: '<p class="empty">상품 정보가 없습니다.</p>') . '</div><div class="order-price-list"><div><span>상품금액</span><b class="num">' . won($order['items_amount']) . '</b></div><div><span>배송비</span><b class="num">' . ((int)$order['shipping_fee'] ? won($order['shipping_fee']) : '무료') . '</b></div>' . ((int)$order['point_used'] ? '<div><span>포인트 사용</span><b class="num discount">-' . num($order['point_used']) . 'P</b></div>' : '') . '<div class="total"><span>결제금액</span><strong class="num">' . won($order['total_amount']) . '</strong></div></div></section><section class="card order-card"><div class="order-card-heading"><h2>주문 처리 이력</h2><span class="muted">' . num($eventCount) . '건</span></div><ol class="order-history">' . $history . '</ol></section><section class="card order-card"><div class="order-card-heading"><h2>주문 메모</h2></div><p class="order-memo">' . ($order['memo'] ? nl2br(e($order['memo'])) : '남겨진 배송 메모가 없습니다.') . '</p></section></div><aside class="order-side"><section class="card order-card"><div class="order-status-line"><span class="chip ' . e($order['status']) . '">' . e(order_status_label($order)) . '</span><span class="chip ' . $deliveryClass . '">' . e($deliveryInfo) . '</span></div>' . ($mergeNotice ? '<p class="order-merge">' . e($mergeNotice) . '</p>' : '') . $mergeLinks . '<dl class="order-meta"><div><dt>회원</dt><dd>' . e($order['login_id']) . '</dd></div><div><dt>받는 분</dt><dd>' . e($order['recipient_name']) . '<br>' . e($order['recipient_phone']) . '</dd></div><div><dt>주소</dt><dd>' . e(trim($order['address1'] . ' ' . $order['address2'])) . '</dd></div><div><dt>결제수단</dt><dd>' . e($order['payment_method'] === 'card' ? '카드결제' : '계좌이체') . '</dd></div><div><dt>현금영수증</dt><dd>' . e($receiptLabel) . ($order['cash_receipt_value'] ? '<br>' . e($order['cash_receipt_value']) : '') . '</dd></div></dl></section><section class="card order-card order-action-card"><h2>주문 처리</h2><p class="action-help">' . e($actionHelp) . '</p><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><div class="order-actions">' . $actionButtons . '</div></form></section></aside></div>';
+    $actionHelp = $activeGroupCount > 1 ? '합배송 주문은 모든 입금 확인이 끝난 뒤 묶음 전체가 함께 배송 준비·완료 처리됩니다.' : ($groupStatus === 'preparing' ? '송장을 PDF로 저장하거나 인쇄한 뒤 배송 완료로 처리하세요.' : '계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.');
+    $groupProductLabel = compact_product_names(implode(',', $productNames));
+    $pageHeading = $activeGroupCount > 1 ? '묶음배송 · ' . $groupProductLabel : '주문 ' . $order['order_no'];
+    $pageSub = $activeGroupCount > 1 ? '결제 ' . num($activeGroupCount) . '건을 한 배송 건으로 관리합니다. · 대표 주문 ' . $order['order_no'] : '결제부터 배송 완료, 취소·반품까지 한 건의 판매 기록으로 관리합니다.';
+    $html = '<div class="page-head"><div><h1>' . e($pageHeading) . '</h1><p class="page-sub">' . e($pageSub) . '</p></div><a class="btn ghost" href="/admin/orders">주문 원장</a></div><div class="order-layout"><div class="order-main"><section class="card order-card"><div class="order-card-heading"><h2>' . ($activeGroupCount > 1 ? '묶음배송 상품' : '주문 상품') . '</h2><span class="muted">' . num($itemCount) . '개 상품</span></div><div class="order-items-list">' . ($list ?: '<p class="empty">상품 정보가 없습니다.</p>') . '</div><div class="order-price-list"><div><span>상품금액 합계</span><b class="num">' . won($groupItemsAmount) . '</b></div><div><span>배송비 합계</span><b class="num">' . ($groupShippingFee ? won($groupShippingFee) : '무료') . '</b></div>' . ($groupPointUsed ? '<div><span>포인트 사용 합계</span><b class="num discount">-' . num($groupPointUsed) . 'P</b></div>' : '') . '<div class="total"><span>결제금액 합계</span><strong class="num">' . won($groupTotalAmount) . '</strong></div></div></section><section class="card order-card"><div class="order-card-heading"><h2>' . ($activeGroupCount > 1 ? '묶음 처리 이력' : '주문 처리 이력') . '</h2><span class="muted">' . num($eventCount) . '건</span></div><ol class="order-history">' . $history . '</ol></section><section class="card order-card"><div class="order-card-heading"><h2>배송 메모</h2></div><p class="order-memo">' . ($order['memo'] ? nl2br(e($order['memo'])) : '남겨진 배송 메모가 없습니다.') . '</p></section></div><aside class="order-side"><section class="card order-card"><div class="order-status-line"><span class="chip ' . e($groupStatus) . '">' . e(order_status_label(['status' => $groupStatus, 'payment_method' => $order['payment_method']])) . '</span><span class="chip ' . $deliveryClass . '">' . e($deliveryInfo) . '</span></div>' . ($mergeNotice ? '<p class="order-merge">' . e($mergeNotice) . '</p>' : '') . $mergeLinks . '<dl class="order-meta"><div><dt>회원</dt><dd>' . e($order['login_id']) . '</dd></div><div><dt>받는 분</dt><dd>' . e($order['recipient_name']) . '<br>' . e($order['recipient_phone']) . '</dd></div><div><dt>주소</dt><dd>' . e(trim($order['address1'] . ' ' . $order['address2'])) . '</dd></div><div><dt>결제수단</dt><dd>' . ($activeGroupCount > 1 ? num($activeGroupCount) . '건 개별 결제' : e($order['payment_method'] === 'card' ? '카드결제' : '계좌이체')) . '</dd></div><div><dt>현금영수증</dt><dd>' . e($receiptLabel) . ($order['cash_receipt_value'] ? '<br>' . e($order['cash_receipt_value']) : '') . '</dd></div></dl></section><section class="card order-card order-action-card"><h2>배송 처리</h2><p class="action-help">' . e($actionHelp) . '</p><form method="post"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><div class="order-actions">' . $actionButtons . '</div></form></section></aside></div>';
     admin_shell('주문 상세', $html);
 }
 
