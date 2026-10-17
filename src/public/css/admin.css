@@ -120,6 +120,7 @@ button, a { touch-action: manipulation; }
 .orders-table .nick-sub { display: block; }
 .orders-table .member-cell { min-width: 230px; }
 .orders-table .member-cell strong { display: block; }
+.orders-table .receipt-sub { color: var(--pink-dd); font-weight: 750; overflow-wrap: anywhere; }
 .orders-table .table-action { margin: 0; }
 .table-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .label-checkbox { display: inline-grid; place-items: center; min-width: 32px; min-height: 32px; cursor: pointer; }

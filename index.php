@@ -75,7 +75,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php13' : '/static/css/shop.css?v=php21';
+    $css = $admin ? '/static/css/admin.css?v=php14' : '/static/css/shop.css?v=php21';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -1318,6 +1318,9 @@ function handle_admin(string $path): never
         $status = (string)($_GET['status'] ?? 'all');
         $statusOptions = ['all' => '전체 주문', 'pending' => '입금 대기', 'paid' => '결제 완료 · 발송 대기', 'kept' => '결제 완료 · 킵 보관', 'preparing' => '배송 준비중', 'shipped' => '배송 완료 · 판매 완료', 'cancelled' => '취소 · 반품'];
         if (!array_key_exists($status, $statusOptions)) $status = 'all';
+        $receipt = (string)($_GET['receipt'] ?? 'all');
+        $receiptOptions = ['all' => '전체', 'requested' => '신청 주문만', 'income' => '소득공제용', 'expense' => '지출증빙용'];
+        if (!array_key_exists($receipt, $receiptOptions)) $receipt = 'all';
         $search = trim((string)($_GET['q'] ?? ''));
         $productId = max(0, (int)($_GET['product_id'] ?? 0));
         $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? (string)$_GET['from'] : '';
@@ -1329,9 +1332,15 @@ function handle_admin(string $path): never
             $where[] = 'EXISTS (SELECT 1 FROM orders status_order WHERE (status_order.id=o.id OR status_order.merge_order_id=o.id) AND status_order.status=?)';
             $params[] = $status;
         }
+        if ($receipt === 'requested') {
+            $where[] = "EXISTS (SELECT 1 FROM orders receipt_order WHERE (receipt_order.id=o.id OR receipt_order.merge_order_id=o.id) AND receipt_order.cash_receipt_type IN ('income','expense'))";
+        } elseif (in_array($receipt, ['income', 'expense'], true)) {
+            $where[] = 'EXISTS (SELECT 1 FROM orders receipt_order WHERE (receipt_order.id=o.id OR receipt_order.merge_order_id=o.id) AND receipt_order.cash_receipt_type=?)';
+            $params[] = $receipt;
+        }
         if ($search !== '') {
-            $where[] = '(u.login_id LIKE ? OR u.name LIKE ? OR u.youtube_nickname LIKE ? OR EXISTS (SELECT 1 FROM orders search_order WHERE (search_order.id=o.id OR search_order.merge_order_id=o.id) AND (search_order.order_no LIKE ? OR search_order.recipient_name LIKE ? OR search_order.youtube_nickname LIKE ? OR search_order.depositor_name LIKE ?)))';
-            for ($i = 0; $i < 7; $i++) $params[] = '%' . $search . '%';
+            $where[] = '(u.login_id LIKE ? OR u.name LIKE ? OR u.youtube_nickname LIKE ? OR EXISTS (SELECT 1 FROM orders search_order WHERE (search_order.id=o.id OR search_order.merge_order_id=o.id) AND (search_order.order_no LIKE ? OR search_order.recipient_name LIKE ? OR search_order.youtube_nickname LIKE ? OR search_order.depositor_name LIKE ? OR search_order.cash_receipt_value LIKE ?)))';
+            for ($i = 0; $i < 8; $i++) $params[] = '%' . $search . '%';
         }
         if ($productId > 0) {
             $where[] = 'EXISTS (SELECT 1 FROM order_items filter_items JOIN orders filter_order ON filter_order.id=filter_items.order_id WHERE (filter_order.id=o.id OR filter_order.merge_order_id=o.id) AND filter_items.product_id=?)';
@@ -1356,7 +1365,8 @@ function handle_admin(string $path): never
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='preparing') AS group_preparing_count,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='shipped') AS group_shipped_count,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='cancelled') AS group_cancelled_count,
-            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled' AND group_order.admin_checked_at IS NULL) AS group_unchecked_count
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled' AND group_order.admin_checked_at IS NULL) AS group_unchecked_count,
+            (SELECT GROUP_CONCAT(CONCAT_WS('~', receipt_order.cash_receipt_type, COALESCE(receipt_order.cash_receipt_value,''), receipt_order.order_no) ORDER BY receipt_order.id SEPARATOR '|') FROM orders receipt_order WHERE (receipt_order.id=o.id OR receipt_order.merge_order_id=o.id) AND receipt_order.cash_receipt_type IN ('income','expense')) AS cash_receipt_requests
             FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
@@ -1373,6 +1383,13 @@ function handle_admin(string $path): never
             $youtubeName = trim((string)($order['youtube_nickname'] ?: $order['user_youtube_nickname']));
             $depositorName = trim((string)$order['depositor_name']);
             $memberCell = '<strong>회원 · ' . e($memberName ?: '-') . '</strong><span class="table-sub">유튜브 · ' . e($youtubeName ?: '-') . '</span><span class="table-sub">입금자 · ' . e($depositorName ?: '-') . '</span><span class="table-sub">상품 · ' . e($order['item_names'] ?: '상품 정보 없음') . '</span>';
+            $receiptRequests = array_filter(explode('|', (string)($order['cash_receipt_requests'] ?? '')));
+            foreach ($receiptRequests as $receiptRequest) {
+                [$receiptType, $receiptValue, $receiptOrderNo] = array_pad(explode('~', $receiptRequest, 3), 3, '');
+                $receiptLabel = $receiptType === 'income' ? '소득공제용' : '지출증빙용';
+                $receiptOrderLabel = count($receiptRequests) > 1 ? ' · ' . $receiptOrderNo : '';
+                $memberCell .= '<span class="table-sub receipt-sub">현금영수증 · ' . e($receiptLabel) . ($receiptValue !== '' ? ' · ' . e($receiptValue) : '') . e($receiptOrderLabel) . '</span>';
+            }
             if ($groupCount > 1) $memberCell .= '<span class="table-sub merge-sub">묶음배송 ' . num($groupCount) . '건 · 한 배송 건으로 관리</span>';
             if ((int)$order['group_unchecked_count'] > 0) $memberCell = '<span class="order-new-indicator"><i class="new-order-dot" aria-hidden="true"></i>신규 주문</span>' . $memberCell;
             $actionCell = '';
@@ -1390,14 +1407,17 @@ function handle_admin(string $path): never
             $orderLabel = $groupCount > 1 ? '<span class="table-sub merge-sub">묶음배송 ' . num($groupCount) . '건</span>' : '<span class="table-sub">' . e($paymentLabel) . '</span>';
             $rows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a>' . $orderLabel . '</td><td class="member-cell">' . $memberCell . '</td><td><span class="chip ' . e($groupStatus) . '">' . e(order_status_label(['status' => $groupStatus, 'payment_method' => $order['payment_method']])) . '</span>' . ($pendingCount > 0 && $groupCount > 1 ? '<span class="table-sub">입금 대기 ' . num($pendingCount) . '건 포함</span>' : '') . $cancelLabel . '</td><td class="amount">' . won($order['group_total_amount']) . '</td><td><span class="table-sub">' . e($dateLabel) . '</span>' . ($order['cancelled_at'] ? '<span class="table-sub">취소 ' . e(dt($order['cancelled_at'])) . '</span>' : '') . '</td><td>' . $actionCell . '</td></tr>';
         }
-        if ($rows === '') $rows = '<tr><td colspan="6" class="empty-cell">조건에 맞는 주문 기록이 없습니다.</td></tr>';
+        if ($rows === '') $rows = '<tr><td colspan="6" class="empty-cell">' . ($receipt !== 'all' ? '조건에 맞는 현금영수증 신청 주문이 없습니다.' : '조건에 맞는 주문 기록이 없습니다.') . '</td></tr>';
         $productOptions = '<option value="0">전체 상품</option>';
         foreach (product_rows(true) as $product) $productOptions .= '<option value="' . (int)$product['id'] . '" ' . ($productId === (int)$product['id'] ? 'selected' : '') . '>' . e($product['name']) . '</option>';
         $statusOptionsHtml = '';
         foreach ($statusOptions as $value => $label) $statusOptionsHtml .= '<option value="' . e($value) . '" ' . ($status === $value ? 'selected' : '') . '>' . e($label) . '</option>';
-        $filterHtml = '<form class="card history-filters" method="get" action="/admin/orders"><div class="filter-title"><div><h2>판매 원장</h2><p>결제 완료·배송 완료·취소·반품 기록을 주문별로 보관합니다. 상세 화면에서 처리 이력과 취소를 확인할 수 있어요.</p></div><span class="chip paid">총 ' . num(count($orders)) . '건</span></div><div class="filter-grid order-filter-grid"><label class="field"><span>상태</span><select name="status">' . $statusOptionsHtml . '</select></label><label class="field"><span>상품</span><select name="product_id">' . $productOptions . '</select></label><label class="field"><span>검색</span><input type="search" name="q" value="' . e($search) . '" placeholder="주문번호·아이디·받는 분"></label><label class="field"><span>주문 시작일</span><input type="date" name="from" value="' . e($from) . '"></label><label class="field"><span>주문 종료일</span><input type="date" name="to" value="' . e($to) . '"></label><div class="filter-submit"><button class="btn pink">필터 적용</button><a class="btn ghost" href="/admin/orders">초기화</a></div></div></form>';
+        $receiptOptionsHtml = '';
+        foreach ($receiptOptions as $value => $label) $receiptOptionsHtml .= '<option value="' . e($value) . '" ' . ($receipt === $value ? 'selected' : '') . '>' . e($label) . '</option>';
+        $filterHtml = '<form class="card history-filters" method="get" action="/admin/orders"><div class="filter-title"><div><h2>판매 원장</h2><p>결제 완료·배송 완료·취소·반품 기록을 주문별로 보관합니다. 현금영수증 신청 유형과 번호도 함께 확인할 수 있어요.</p></div><span class="chip paid">총 ' . num(count($orders)) . '건</span></div><div class="filter-grid order-filter-grid"><label class="field"><span>상태</span><select name="status">' . $statusOptionsHtml . '</select></label><label class="field"><span>현금영수증</span><select name="receipt">' . $receiptOptionsHtml . '</select></label><label class="field"><span>상품</span><select name="product_id">' . $productOptions . '</select></label><label class="field"><span>검색</span><input type="search" name="q" value="' . e($search) . '" placeholder="주문번호·아이디·영수증 번호…" autocomplete="off"></label><label class="field"><span>주문 시작일</span><input type="date" name="from" value="' . e($from) . '"></label><label class="field"><span>주문 종료일</span><input type="date" name="to" value="' . e($to) . '"></label><div class="filter-submit"><button class="btn pink">필터 적용</button><a class="btn ghost" href="/admin/orders">초기화</a></div></div></form>';
         $ordersTable = '<div class="table-wrap"><table class="orders-table"><thead><tr><th>주문번호</th><th>회원 · 유튜브 · 입금자 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th><th>처리</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
-        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . $ordersTable);
+        $receiptShortcut = $receipt === 'all' ? '<a class="btn soft" href="/admin/orders?receipt=requested">현금영수증 신청 모아보기</a>' : '<a class="btn ghost" href="/admin/orders">전체 주문 보기</a>';
+        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div>' . $receiptShortcut . '</div>' . $filterHtml . $ordersTable);
     }
 
     if ($path === '/admin/orders/labels') {
