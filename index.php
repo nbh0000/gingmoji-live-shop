@@ -1367,7 +1367,7 @@ function handle_admin(string $path): never
             $groupCount = max(1, (int)$order['group_order_count']);
             $pendingCount = (int)$order['group_pending_count'];
             $groupStatus = $pendingCount > 0 ? 'pending' : ((int)$order['group_paid_count'] > 0 ? 'paid' : ((int)$order['group_preparing_count'] > 0 ? 'preparing' : ((int)$order['group_shipped_count'] > 0 ? 'shipped' : 'cancelled')));
-            $printable = $order['delivery_type'] === 'direct' && in_array($groupStatus, ['preparing', 'shipped'], true);
+            $printable = $order['delivery_type'] === 'direct' && in_array($groupStatus, ['paid', 'preparing', 'shipped'], true);
             if ($printable) $printableCount++;
             $cancelLabel = $groupStatus === 'cancelled' && $order['cancel_reason'] ? '<span class="table-sub">' . e($order['cancel_reason']) . '</span>' : '';
             $memberName = trim((string)($order['user_name'] ?: $order['login_id']));
@@ -1398,7 +1398,7 @@ function handle_admin(string $path): never
         $statusOptionsHtml = '';
         foreach ($statusOptions as $value => $label) $statusOptionsHtml .= '<option value="' . e($value) . '" ' . ($status === $value ? 'selected' : '') . '>' . e($label) . '</option>';
         $filterHtml = '<form class="card history-filters" method="get" action="/admin/orders"><div class="filter-title"><div><h2>판매 원장</h2><p>결제 완료·배송 완료·취소·반품 기록을 주문별로 보관합니다. 상세 화면에서 처리 이력과 취소를 확인할 수 있어요.</p></div><span class="chip paid">총 ' . num(count($orders)) . '건</span></div><div class="filter-grid order-filter-grid"><label class="field"><span>상태</span><select name="status">' . $statusOptionsHtml . '</select></label><label class="field"><span>상품</span><select name="product_id">' . $productOptions . '</select></label><label class="field"><span>검색</span><input type="search" name="q" value="' . e($search) . '" placeholder="주문번호·아이디·받는 분"></label><label class="field"><span>주문 시작일</span><input type="date" name="from" value="' . e($from) . '"></label><label class="field"><span>주문 종료일</span><input type="date" name="to" value="' . e($to) . '"></label><div class="filter-submit"><button class="btn pink">필터 적용</button><a class="btn ghost" href="/admin/orders">초기화</a></div></div></form>';
-        $bulkHelp = $printableCount > 0 ? '배송준비중·배송완료 주문만 선택됩니다. 묶음배송은 송장 1장으로 출력돼요.' : '배송준비중으로 변경한 주문이 생기면 여기서 송장을 선택할 수 있어요.';
+        $bulkHelp = $printableCount > 0 ? '결제완료·발송대기부터 배송완료 주문까지 선택됩니다. 묶음배송은 송장 1장으로 출력돼요.' : '바로배송 결제완료 주문이 생기면 여기서 송장을 선택할 수 있어요.';
         $bulkPrint = '<div class="table-wrap"><table class="orders-table"><thead><tr><th class="check"><label class="label-checkbox"><input type="checkbox" data-check-all aria-label="출력 가능한 송장 전체 선택"' . ($printableCount ? '' : ' disabled') . '><span class="sr-only">출력 가능한 송장 전체 선택</span></label></th><th>주문번호</th><th>회원 · 유튜브 · 입금자 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th><th>처리</th></tr></thead><tbody>' . $rows . '</tbody></table></div><form id="labelPrintForm" method="get" action="/admin/orders/labels" target="_blank" data-label-print-form><input type="hidden" name="print" value="1"><div class="bulk label-bulk"><span class="sel" aria-live="polite"><b data-sel-count>0</b>건 선택</span><span class="bulk-help">' . e($bulkHelp) . '</span><button class="btn pink" type="submit" data-need-sel disabled>선택 송장 출력</button></div></form>';
         admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . $bulkPrint);
     }
@@ -1895,9 +1895,9 @@ function admin_order_label(int $id): never
 
     $groupOrders = merge_group_orders(db(), $order);
     $activeGroupOrders = array_values(array_filter($groupOrders, static fn(array $member): bool => $member['status'] !== 'cancelled'));
-    $notReady = array_filter($activeGroupOrders, static fn(array $member): bool => !in_array($member['status'], ['preparing', 'shipped'], true));
+    $notReady = array_filter($activeGroupOrders, static fn(array $member): bool => !in_array($member['status'], ['paid', 'preparing', 'shipped'], true));
     if (!$activeGroupOrders || $notReady) {
-        admin_shell('송장 출력 불가', '<div class="page-head"><div><h1>송장 출력 준비가 필요합니다.</h1><p class="page-sub">모든 주문을 배송준비중으로 변경한 뒤 출력해 주세요.</p></div><a class="btn ghost" href="/admin/orders/' . $id . '">주문으로 돌아가기</a></div>');
+        admin_shell('송장 출력 불가', '<div class="page-head"><div><h1>송장을 출력할 수 없는 주문입니다.</h1><p class="page-sub">바로배송 결제완료 주문부터 송장을 출력할 수 있어요.</p></div><a class="btn ghost" href="/admin/orders/' . $id . '">주문으로 돌아가기</a></div>');
     }
 
     $items = db()->prepare("SELECT oi.*, source_order.order_no AS source_order_no FROM order_items oi JOIN orders source_order ON source_order.id=oi.order_id WHERE (source_order.id=? OR source_order.merge_order_id=?) AND source_order.status<>'cancelled' ORDER BY source_order.id,oi.id");
@@ -1926,7 +1926,8 @@ function admin_order_label(int $id): never
     $recipientAddress = trim(($zipcode !== '' ? '(' . $zipcode . ') ' : '') . (string)$order['address1'] . ' ' . (string)$order['address2']);
     $memo = trim((string)$order['memo']);
     $memoHtml = $memo !== '' ? nl2br(e($memo)) : '배송 메모 없음';
-    $statusLabel = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'preparing')) > 0 ? '배송준비중' : '배송완료 · 재출력';
+    $activeStatuses = array_column($activeGroupOrders, 'status');
+    $statusLabel = in_array('paid', $activeStatuses, true) ? '결제완료 · 발송대기' : (in_array('preparing', $activeStatuses, true) ? '배송준비중' : '배송완료 · 재출력');
     $documentTitle = '배송송장_' . implode('_', $orderNumbers);
     $autoPrint = !empty($_GET['print']);
     $printScript = $autoPrint ? "window.addEventListener('load',()=>setTimeout(()=>window.print(),300));" : '';
@@ -1972,9 +1973,9 @@ function admin_order_label_data(int $requestedId): array
 
     $groupOrders = merge_group_orders($pdo, $order);
     $activeGroupOrders = array_values(array_filter($groupOrders, static fn(array $member): bool => $member['status'] !== 'cancelled'));
-    $notReady = array_filter($activeGroupOrders, static fn(array $member): bool => !in_array($member['status'], ['preparing', 'shipped'], true));
+    $notReady = array_filter($activeGroupOrders, static fn(array $member): bool => !in_array($member['status'], ['paid', 'preparing', 'shipped'], true));
     if ($order['delivery_type'] !== 'direct' || !$activeGroupOrders || $notReady) {
-        throw new RuntimeException('바로배송 주문을 모두 배송준비중으로 변경한 뒤 출력해 주세요.');
+        throw new RuntimeException('바로배송 결제완료 주문부터 송장을 출력할 수 있어요.');
     }
 
     $itemStmt = $pdo->prepare("SELECT oi.*, source_order.order_no AS source_order_no FROM order_items oi JOIN orders source_order ON source_order.id=oi.order_id WHERE (source_order.id=? OR source_order.merge_order_id=?) AND source_order.status<>'cancelled' ORDER BY source_order.id,oi.id");
@@ -2010,7 +2011,7 @@ function admin_order_label_data(int $requestedId): array
         'memos' => $memos,
         'items' => $items,
         'total_quantity' => $totalQuantity,
-        'status_label' => count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'preparing')) > 0 ? '배송준비중' : '배송완료 · 재출력',
+        'status_label' => in_array('paid', array_column($activeGroupOrders, 'status'), true) ? '결제완료 · 발송대기' : (in_array('preparing', array_column($activeGroupOrders, 'status'), true) ? '배송준비중' : '배송완료 · 재출력'),
         'courier' => trim((string)($order['courier'] ?? '')),
         'tracking_no' => trim((string)($order['tracking_no'] ?? '')),
     ];
