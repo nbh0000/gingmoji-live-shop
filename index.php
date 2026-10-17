@@ -1352,6 +1352,7 @@ function handle_admin(string $path): never
             (SELECT COALESCE(SUM(group_order.total_amount),0) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled') AS group_total_amount,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='pending') AS group_pending_count,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='paid') AS group_paid_count,
+            (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='kept') AS group_kept_count,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='preparing') AS group_preparing_count,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='shipped') AS group_shipped_count,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='cancelled') AS group_cancelled_count,
@@ -1360,15 +1361,13 @@ function handle_admin(string $path): never
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
         $rows = '';
-        $printableCount = 0;
         foreach ($orders as $order) {
             $paymentLabel = $order['payment_method'] === 'card' ? '카드결제' : '계좌이체';
             $dateLabel = $order['paid_at'] ? '결제 ' . dt($order['paid_at']) : '주문 ' . dt($order['created_at']);
             $groupCount = max(1, (int)$order['group_order_count']);
             $pendingCount = (int)$order['group_pending_count'];
-            $groupStatus = $pendingCount > 0 ? 'pending' : ((int)$order['group_paid_count'] > 0 ? 'paid' : ((int)$order['group_preparing_count'] > 0 ? 'preparing' : ((int)$order['group_shipped_count'] > 0 ? 'shipped' : 'cancelled')));
+            $groupStatus = $pendingCount > 0 ? 'pending' : ((int)$order['group_paid_count'] > 0 ? 'paid' : ((int)$order['group_preparing_count'] > 0 ? 'preparing' : ((int)$order['group_shipped_count'] > 0 ? 'shipped' : ((int)$order['group_kept_count'] > 0 ? 'kept' : 'cancelled'))));
             $printable = $order['delivery_type'] === 'direct' && in_array($groupStatus, ['paid', 'preparing', 'shipped'], true);
-            if ($printable) $printableCount++;
             $cancelLabel = $groupStatus === 'cancelled' && $order['cancel_reason'] ? '<span class="table-sub">' . e($order['cancel_reason']) . '</span>' : '';
             $memberName = trim((string)($order['user_name'] ?: $order['login_id']));
             $youtubeName = trim((string)($order['youtube_nickname'] ?: $order['user_youtube_nickname']));
@@ -1389,18 +1388,16 @@ function handle_admin(string $path): never
                 $actionCell = '<div class="table-actions">' . $actionCell . $printLink . '</div>';
             }
             $orderLabel = $groupCount > 1 ? '<span class="table-sub merge-sub">묶음배송 ' . num($groupCount) . '건</span>' : '<span class="table-sub">' . e($paymentLabel) . '</span>';
-            $selectCell = $printable ? '<label class="label-checkbox"><input type="checkbox" name="ids[]" value="' . (int)$order['id'] . '" form="labelPrintForm" data-check aria-label="' . e($order['order_no']) . ' 송장 선택"><span class="sr-only">' . e($order['order_no']) . ' 송장 선택</span></label>' : '<span class="label-unavailable" aria-label="송장 출력 준비 전">—</span>';
-            $rows .= '<tr><td class="check">' . $selectCell . '</td><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a>' . $orderLabel . '</td><td class="member-cell">' . $memberCell . '</td><td><span class="chip ' . e($groupStatus) . '">' . e(order_status_label(['status' => $groupStatus, 'payment_method' => $order['payment_method']])) . '</span>' . ($pendingCount > 0 && $groupCount > 1 ? '<span class="table-sub">입금 대기 ' . num($pendingCount) . '건 포함</span>' : '') . $cancelLabel . '</td><td class="amount">' . won($order['group_total_amount']) . '</td><td><span class="table-sub">' . e($dateLabel) . '</span>' . ($order['cancelled_at'] ? '<span class="table-sub">취소 ' . e(dt($order['cancelled_at'])) . '</span>' : '') . '</td><td>' . $actionCell . '</td></tr>';
+            $rows .= '<tr><td><a class="order-no" href="/admin/orders/' . (int)$order['id'] . '">' . e($order['order_no']) . '</a>' . $orderLabel . '</td><td class="member-cell">' . $memberCell . '</td><td><span class="chip ' . e($groupStatus) . '">' . e(order_status_label(['status' => $groupStatus, 'payment_method' => $order['payment_method']])) . '</span>' . ($pendingCount > 0 && $groupCount > 1 ? '<span class="table-sub">입금 대기 ' . num($pendingCount) . '건 포함</span>' : '') . $cancelLabel . '</td><td class="amount">' . won($order['group_total_amount']) . '</td><td><span class="table-sub">' . e($dateLabel) . '</span>' . ($order['cancelled_at'] ? '<span class="table-sub">취소 ' . e(dt($order['cancelled_at'])) . '</span>' : '') . '</td><td>' . $actionCell . '</td></tr>';
         }
-        if ($rows === '') $rows = '<tr><td colspan="7" class="empty-cell">조건에 맞는 주문 기록이 없습니다.</td></tr>';
+        if ($rows === '') $rows = '<tr><td colspan="6" class="empty-cell">조건에 맞는 주문 기록이 없습니다.</td></tr>';
         $productOptions = '<option value="0">전체 상품</option>';
         foreach (product_rows(true) as $product) $productOptions .= '<option value="' . (int)$product['id'] . '" ' . ($productId === (int)$product['id'] ? 'selected' : '') . '>' . e($product['name']) . '</option>';
         $statusOptionsHtml = '';
         foreach ($statusOptions as $value => $label) $statusOptionsHtml .= '<option value="' . e($value) . '" ' . ($status === $value ? 'selected' : '') . '>' . e($label) . '</option>';
         $filterHtml = '<form class="card history-filters" method="get" action="/admin/orders"><div class="filter-title"><div><h2>판매 원장</h2><p>결제 완료·배송 완료·취소·반품 기록을 주문별로 보관합니다. 상세 화면에서 처리 이력과 취소를 확인할 수 있어요.</p></div><span class="chip paid">총 ' . num(count($orders)) . '건</span></div><div class="filter-grid order-filter-grid"><label class="field"><span>상태</span><select name="status">' . $statusOptionsHtml . '</select></label><label class="field"><span>상품</span><select name="product_id">' . $productOptions . '</select></label><label class="field"><span>검색</span><input type="search" name="q" value="' . e($search) . '" placeholder="주문번호·아이디·받는 분"></label><label class="field"><span>주문 시작일</span><input type="date" name="from" value="' . e($from) . '"></label><label class="field"><span>주문 종료일</span><input type="date" name="to" value="' . e($to) . '"></label><div class="filter-submit"><button class="btn pink">필터 적용</button><a class="btn ghost" href="/admin/orders">초기화</a></div></div></form>';
-        $bulkHelp = $printableCount > 0 ? '결제완료·발송대기부터 배송완료 주문까지 선택됩니다. 묶음배송은 송장 1장으로 출력돼요.' : '바로배송 결제완료 주문이 생기면 여기서 송장을 선택할 수 있어요.';
-        $bulkPrint = '<div class="table-wrap"><table class="orders-table"><thead><tr><th class="check"><label class="label-checkbox"><input type="checkbox" data-check-all aria-label="출력 가능한 송장 전체 선택"' . ($printableCount ? '' : ' disabled') . '><span class="sr-only">출력 가능한 송장 전체 선택</span></label></th><th>주문번호</th><th>회원 · 유튜브 · 입금자 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th><th>처리</th></tr></thead><tbody>' . $rows . '</tbody></table></div><form id="labelPrintForm" method="get" action="/admin/orders/labels" target="_blank" data-label-print-form><input type="hidden" name="print" value="1"><div class="bulk label-bulk"><span class="sel" aria-live="polite"><b data-sel-count>0</b>건 선택</span><span class="bulk-help">' . e($bulkHelp) . '</span><button class="btn pink" type="submit" data-need-sel disabled>선택 송장 출력</button></div></form>';
-        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . $bulkPrint);
+        $ordersTable = '<div class="table-wrap"><table class="orders-table"><thead><tr><th>주문번호</th><th>회원 · 유튜브 · 입금자 · 상품</th><th>상태</th><th>금액</th><th>처리 일시</th><th>처리</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
+        admin_shell('주문 관리', '<div class="page-head"><div><h1>주문 관리</h1><p class="page-sub">입금 대기부터 판매 완료, 취소·반품까지 하나의 ERP 원장으로 관리합니다.</p></div></div>' . $filterHtml . $ordersTable);
     }
 
     if ($path === '/admin/orders/labels') {
@@ -2109,9 +2106,10 @@ function admin_order(int $id): never
     $activeGroupCount = count($activeGroupOrders);
     $pendingGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'pending'));
     $paidGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'paid'));
+    $keptGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'kept'));
     $preparingGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'preparing'));
     $shippedGroupCount = count(array_filter($activeGroupOrders, static fn(array $member): bool => $member['status'] === 'shipped'));
-    $groupStatus = $pendingGroupCount > 0 ? 'pending' : ($paidGroupCount > 0 ? 'paid' : ($preparingGroupCount > 0 ? 'preparing' : ($shippedGroupCount > 0 ? 'shipped' : 'cancelled')));
+    $groupStatus = $pendingGroupCount > 0 ? 'pending' : ($paidGroupCount > 0 ? 'paid' : ($preparingGroupCount > 0 ? 'preparing' : ($shippedGroupCount > 0 ? 'shipped' : ($keptGroupCount > 0 ? 'kept' : 'cancelled'))));
     $groupItemsAmount = array_sum(array_map(static fn(array $member): int => (int)$member['items_amount'], $activeGroupOrders));
     $groupShippingFee = array_sum(array_map(static fn(array $member): int => (int)$member['shipping_fee'], $activeGroupOrders));
     $groupPointUsed = array_sum(array_map(static fn(array $member): int => (int)$member['point_used'], $activeGroupOrders));
@@ -2180,7 +2178,7 @@ function admin_order(int $id): never
     if ($canPrintLabel) $actionButtons = '<a class="btn soft" href="/admin/orders/labels?ids%5B%5D=' . $id . '&amp;print=1" target="_blank" rel="noopener">송장 출력</a>' . $actionButtons;
     if ($actionButtons === '') $actionButtons = '<span class="hint">추가로 처리할 작업이 없습니다.</span>';
     $receiptLabel = $order['cash_receipt_type'] === 'income' ? '소득공제용' : ($order['cash_receipt_type'] === 'expense' ? '지출증빙용' : '신청 안 함');
-    $actionHelp = $activeGroupCount > 1 ? ($canPrintLabel ? '합배송 송장은 1장으로 출력되고, 배송 상태도 묶음 전체에 함께 적용됩니다.' : '합배송 주문은 모든 입금 확인이 끝난 뒤 묶음 전체가 함께 배송 준비·완료 처리됩니다.') : ($groupStatus === 'paid' ? '송장을 출력한 뒤 배송 준비중으로 변경하세요.' : ($groupStatus === 'preparing' ? '송장을 출력한 뒤 배송 완료로 처리하세요.' : ($groupStatus === 'shipped' ? '필요하면 송장을 다시 출력하거나 반품·환불 처리하세요.' : '계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.')));
+    $actionHelp = $activeGroupCount > 1 ? ($canPrintLabel ? '합배송 송장은 1장으로 출력되고, 배송 상태도 묶음 전체에 함께 적용됩니다.' : '합배송 주문은 모든 입금 확인이 끝난 뒤 묶음 전체가 함께 배송 준비·완료 처리됩니다.') : ($groupStatus === 'kept' ? '킵 보관 중인 주문입니다. 고객이 출고를 요청하면 배송 처리 단계로 이동합니다.' : ($groupStatus === 'paid' ? '송장을 출력한 뒤 배송 준비중으로 변경하세요.' : ($groupStatus === 'preparing' ? '송장을 출력한 뒤 배송 완료로 처리하세요.' : ($groupStatus === 'shipped' ? '필요하면 송장을 다시 출력하거나 반품·환불 처리하세요.' : '계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.'))));
     $groupProductLabel = compact_product_names(implode(',', $productNames));
     $pageHeading = $activeGroupCount > 1 ? '묶음배송 · ' . $groupProductLabel : '주문 ' . $order['order_no'];
     $pageSub = $activeGroupCount > 1 ? '결제 ' . num($activeGroupCount) . '건을 한 배송 건으로 관리합니다. · 대표 주문 ' . $order['order_no'] : '결제부터 배송 완료, 취소·반품까지 한 건의 판매 기록으로 관리합니다.';
