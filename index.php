@@ -2162,6 +2162,7 @@ function admin_order(int $id): never
         $mergeLinks = '<div class="order-merge-links"><div class="merge-group-title"><strong>묶음배송 ' . num($activeGroupCount) . '건</strong><b class="num">' . won($groupTotalAmount) . '</b></div>' . $memberRows . '<span class="muted">관리자 주문 원장에서는 한 건으로 표시되고, 배송 상태도 함께 처리됩니다.</span></div>';
     }
     $actionButtons = '';
+    $canPrintLabel = $order['delivery_type'] === 'direct' && in_array($groupStatus, ['paid', 'preparing', 'shipped'], true);
     if ($order['status'] === 'pending' && $activeGroupCount === 1) $actionButtons .= '<button class="btn pink" name="action" value="confirm">입금 확인 · 결제 완료</button>';
     if ($order['status'] === 'paid') {
         if ($activeGroupCount > 1 && $pendingGroupCount > 0) $actionButtons .= '<button class="btn pink" type="button" disabled>입금대기 ' . num($pendingGroupCount) . '건 확인 후 배송 준비</button>';
@@ -2170,16 +2171,16 @@ function admin_order(int $id): never
     if ($order['status'] === 'preparing') {
         if ($pendingGroupCount > 0 || $paidGroupCount > 0) $actionButtons .= '<button class="btn pink" type="button" disabled>묶음 주문 상태 확인 후 배송 완료</button>';
         else {
-            $actionButtons .= '<a class="btn soft" href="/admin/orders/labels?ids%5B%5D=' . $id . '&amp;print=1" target="_blank" rel="noopener">송장 PDF 출력</a>';
             $actionButtons .= '<button class="btn pink" name="action" value="ship">' . ($activeGroupCount > 1 ? '합배송 ' . num($activeGroupCount) . '건 배송 완료' : '배송 완료 처리') . '</button>';
         }
     }
     if ($order['status'] !== 'cancelled' && $order['status'] === 'shipped') $actionButtons .= '<input type="hidden" name="cancel_kind" value="return"><button class="btn danger" name="action" value="cancel">반품 · 환불 처리</button>';
     if ($order['status'] !== 'cancelled' && $order['status'] !== 'shipped') $actionButtons .= '<label class="action-select"><span>취소 유형</span><select name="cancel_kind"><option value="cancel">주문 취소 · 환불</option><option value="return">반품 · 환불</option></select></label><button class="btn danger" name="action" value="cancel">취소 처리</button>';
     if ($order['status'] === 'cancelled') $actionButtons .= '<button class="btn danger" name="action" value="delete" data-confirm-dialog="' . e($order['order_no']) . ' 주문을 완전히 삭제할까요? 삭제 후에는 되돌릴 수 없습니다">주문 자체 삭제</button>';
+    if ($canPrintLabel) $actionButtons = '<a class="btn soft" href="/admin/orders/labels?ids%5B%5D=' . $id . '&amp;print=1" target="_blank" rel="noopener">송장 출력</a>' . $actionButtons;
     if ($actionButtons === '') $actionButtons = '<span class="hint">추가로 처리할 작업이 없습니다.</span>';
     $receiptLabel = $order['cash_receipt_type'] === 'income' ? '소득공제용' : ($order['cash_receipt_type'] === 'expense' ? '지출증빙용' : '신청 안 함');
-    $actionHelp = $activeGroupCount > 1 ? '합배송 주문은 모든 입금 확인이 끝난 뒤 묶음 전체가 함께 배송 준비·완료 처리됩니다.' : ($groupStatus === 'preparing' ? '송장을 PDF로 저장하거나 인쇄한 뒤 배송 완료로 처리하세요.' : '계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.');
+    $actionHelp = $activeGroupCount > 1 ? ($canPrintLabel ? '합배송 송장은 1장으로 출력되고, 배송 상태도 묶음 전체에 함께 적용됩니다.' : '합배송 주문은 모든 입금 확인이 끝난 뒤 묶음 전체가 함께 배송 준비·완료 처리됩니다.') : ($groupStatus === 'paid' ? '송장을 출력한 뒤 배송 준비중으로 변경하세요.' : ($groupStatus === 'preparing' ? '송장을 출력한 뒤 배송 완료로 처리하세요.' : ($groupStatus === 'shipped' ? '필요하면 송장을 다시 출력하거나 반품·환불 처리하세요.' : '계좌이체는 입금 확인 후 결제 완료로 바꾸고, 배송 준비중을 거쳐 배송 완료로 처리하세요.')));
     $groupProductLabel = compact_product_names(implode(',', $productNames));
     $pageHeading = $activeGroupCount > 1 ? '묶음배송 · ' . $groupProductLabel : '주문 ' . $order['order_no'];
     $pageSub = $activeGroupCount > 1 ? '결제 ' . num($activeGroupCount) . '건을 한 배송 건으로 관리합니다. · 대표 주문 ' . $order['order_no'] : '결제부터 배송 완료, 취소·반품까지 한 건의 판매 기록으로 관리합니다.';
