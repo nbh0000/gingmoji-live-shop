@@ -1325,7 +1325,7 @@ function handle_admin(string $path): never
         $productId = max(0, (int)($_GET['product_id'] ?? 0));
         $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? (string)$_GET['from'] : '';
         $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['to'] ?? '')) ? (string)$_GET['to'] : '';
-        // 합배송 추가 주문은 대표 주문 한 행에 합쳐서 보여 준다.
+        // 합배송 추가 주문은 대표 주문 한 행에 합쳐서 보여 주고, 추가 주문이 들어온 묶음은 최신 주문 기준으로 맨 위에 올린다.
         $where = ['o.merge_order_id IS NULL'];
         $params = [];
         if ($status !== 'all') {
@@ -1346,14 +1346,17 @@ function handle_admin(string $path): never
             $where[] = 'EXISTS (SELECT 1 FROM order_items filter_items JOIN orders filter_order ON filter_order.id=filter_items.order_id WHERE (filter_order.id=o.id OR filter_order.merge_order_id=o.id) AND filter_items.product_id=?)';
             $params[] = $productId;
         }
+        // 기간 필터는 묶음 안의 주문 중 하나라도 기간에 들어오면 표시한다(추가 주문 포함).
+        $dateWhere = [];
         if ($from !== '') {
-            $where[] = 'o.created_at >= ?';
+            $dateWhere[] = 'date_order.created_at >= ?';
             $params[] = $from . ' 00:00:00';
         }
         if ($to !== '') {
-            $where[] = 'o.created_at < DATE_ADD(?, INTERVAL 1 DAY)';
+            $dateWhere[] = 'date_order.created_at < DATE_ADD(?, INTERVAL 1 DAY)';
             $params[] = $to . ' 00:00:00';
         }
+        if ($dateWhere) $where[] = 'EXISTS (SELECT 1 FROM orders date_order WHERE (date_order.id=o.id OR date_order.merge_order_id=o.id) AND ' . implode(' AND ', $dateWhere) . ')';
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
         $stmt = db()->prepare("SELECT o.*, u.login_id, u.name AS user_name, u.youtube_nickname AS user_youtube_nickname,
             (SELECT GROUP_CONCAT(DISTINCT oi.product_name ORDER BY oi.id SEPARATOR ', ') FROM order_items oi JOIN orders item_order ON item_order.id=oi.order_id WHERE (item_order.id=o.id OR item_order.merge_order_id=o.id) AND item_order.status<>'cancelled') AS item_names,
@@ -1367,7 +1370,7 @@ function handle_admin(string $path): never
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='cancelled') AS group_cancelled_count,
             (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status<>'cancelled' AND group_order.admin_checked_at IS NULL) AS group_unchecked_count,
             (SELECT GROUP_CONCAT(CONCAT_WS('~', receipt_order.cash_receipt_type, COALESCE(receipt_order.cash_receipt_value,''), receipt_order.order_no) ORDER BY receipt_order.id SEPARATOR '|') FROM orders receipt_order WHERE (receipt_order.id=o.id OR receipt_order.merge_order_id=o.id) AND receipt_order.cash_receipt_type IN ('income','expense')) AS cash_receipt_requests
-            FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY o.id DESC");
+            FROM orders o JOIN users u ON u.id=o.user_id $whereSql ORDER BY (SELECT MAX(latest_order.id) FROM orders latest_order WHERE latest_order.id=o.id OR (latest_order.merge_order_id=o.id AND latest_order.status<>'cancelled')) DESC, o.id DESC");
         $stmt->execute($params);
         $orders = $stmt->fetchAll();
         $rows = '';
@@ -1549,7 +1552,7 @@ function admin_user_detail(int $id): never
         (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='paid') AS group_paid_count,
         (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='preparing') AS group_preparing_count,
         (SELECT COUNT(*) FROM orders group_order WHERE (group_order.id=o.id OR group_order.merge_order_id=o.id) AND group_order.status='shipped') AS group_shipped_count
-        FROM orders o WHERE o.user_id=? AND o.merge_order_id IS NULL ORDER BY o.id DESC LIMIT 50");
+        FROM orders o WHERE o.user_id=? AND o.merge_order_id IS NULL ORDER BY (SELECT MAX(latest_order.id) FROM orders latest_order WHERE latest_order.id=o.id OR (latest_order.merge_order_id=o.id AND latest_order.status<>'cancelled')) DESC, o.id DESC LIMIT 50");
     $ordersStmt->execute([$id]);
     $orders = $ordersStmt->fetchAll();
     $orderRows = '';
