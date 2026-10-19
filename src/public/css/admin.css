@@ -382,3 +382,29 @@ tr.dragging td { background: var(--pink-ll); }
 .chip.coupon-expired, .chip.coupon-revoked { background: #f1eceb; color: #a89a9c; }
 .coupon-user input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; accent-color: var(--pink-d); }
 .coupon-user { padding: 5px 2px; }
+/* 배송 관리 2 */
+.ship-steps { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 12px; padding: 10px 14px; list-style: none; border-radius: 14px; background: var(--pink-l); font-size: 13px; font-weight: 700; color: var(--ink); }
+.ship-steps b { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 4px; border-radius: 50%; background: var(--night); color: var(--cream); font-size: 11px; }
+.ship-toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; padding: 12px 14px; border-radius: 16px; background: #fff; box-shadow: 0 6px 18px -10px rgba(36, 27, 29, 0.35); }
+.ship-toolbar-left, .ship-toolbar-actions, .ship-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ship-toolbar-left { gap: 12px; }
+.ship-toolbar input[type="search"] { min-width: 200px; min-height: 36px; padding: 6px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
+.ship-toolbar .btn[disabled] { opacity: 0.4; pointer-events: none; }
+.ship-day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.ship-day-head h2 { margin: 0; }
+.ship-select-all { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.ship-day[hidden], tr[data-ship-row][hidden] { display: none; }
+.ship-table td { vertical-align: top; }
+.ship-check input, .ship-select-all input { width: 18px; height: 18px; accent-color: var(--pink-d); }
+.ship-recipient strong { font-size: 15px; }
+.ship-phone { font-weight: 700; color: var(--ink); }
+.ship-memo { display: block; margin-top: 4px; padding: 3px 8px; border-radius: 8px; background: #fff3cd; color: #7a5300; font-size: 12px; font-weight: 700; }
+.ship-items ul { margin: 6px 0 4px; padding-left: 16px; font-size: 13px; line-height: 1.55; }
+.ship-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip.merge { background: #efe7ff; color: #6a4bb5; }
+.ship-tracking { display: grid; grid-template-columns: 1fr; gap: 4px; min-width: 150px; }
+.ship-tracking select, .ship-tracking input { min-height: 34px; padding: 4px 8px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; font-size: 13px; }
+.ship-done { margin-bottom: 16px; }
+.ship-done summary { cursor: pointer; font-weight: 800; font-size: 15px; }
+@media (max-width: 900px) { .ship-toolbar { position: static; } .ship-toolbar input[type="search"] { min-width: 0; flex: 1; } }
+.chip.same-address { background: #fff3cd; color: #7a5300; }

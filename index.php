@@ -76,7 +76,7 @@ function page(string $title, string $body, bool $admin = false, array $scripts =
     $s = setting_values();
     $flash = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
-    $css = $admin ? '/static/css/admin.css?v=php15' : '/static/css/shop.css?v=php23';
+    $css = $admin ? '/static/css/admin.css?v=php16' : '/static/css/shop.css?v=php24';
     $extra = '';
     foreach ($scripts as $script) {
         $extra .= '<script src="' . e($script) . '"></script>';
@@ -1063,7 +1063,7 @@ function render_order(string $orderNo): never
             ? '<br>주문 ' . e($member['order_no']) . '에 추가 · 함께 배송 (배송비 없음)'
             : '<br>추가 주문 ' . e($member['order_no']) . ' · ' . e(order_status_label($member)) . ' · 함께 배송';
     }
-    $body = '<main class="wrap page"><div class="panel"><h1>주문 완료</h1><p>주문번호 <strong>' . e($order['order_no']) . '</strong></p><p>상태: ' . e(order_status_label($order)) . '<br>배송 방식: ' . e($deliveryLabel) . $mergeNotice . '</p><ul class="order-items">' . $rows . '</ul>' . $reviewBlock . ((int)$order['coupon_discount'] > 0 ? '<div class="sum-row"><span>쿠폰 할인</span><span>-' . won($order['coupon_discount']) . '</span></div>' : '') . '<div class="sum-row total"><span>결제금액</span><span>' . won($order['total_amount']) . '</span></div><div class="notice">입금 계좌: ' . e($settings['bank_name']) . ' ' . e($settings['bank_account']) . ' (' . e($settings['bank_holder']) . ')<br>입금자명: ' . e($order['depositor_name']) . '<br>현금영수증: ' . e($receipt) . '</div><a class="btn block" href="/my/orders">주문 내역 보기</a></div></main>';
+    $body = '<main class="wrap page"><div class="panel"><h1>주문 완료</h1><p>주문번호 <strong>' . e($order['order_no']) . '</strong></p><p>상태: ' . e(order_status_label($order)) . '<br>배송 방식: ' . e($deliveryLabel) . $mergeNotice . '</p>' . order_ship_info_html($order) . '<ul class="order-items">' . $rows . '</ul>' . $reviewBlock . ((int)$order['coupon_discount'] > 0 ? '<div class="sum-row"><span>쿠폰 할인</span><span>-' . won($order['coupon_discount']) . '</span></div>' : '') . '<div class="sum-row total"><span>결제금액</span><span>' . won($order['total_amount']) . '</span></div><div class="notice">입금 계좌: ' . e($settings['bank_name']) . ' ' . e($settings['bank_account']) . ' (' . e($settings['bank_holder']) . ')<br>입금자명: ' . e($order['depositor_name']) . '<br>현금영수증: ' . e($receipt) . '</div><a class="btn block" href="/my/orders">주문 내역 보기</a></div></main>';
     page('주문 완료', $body);
 }
 
@@ -1299,8 +1299,8 @@ function handle_admin(string $path): never
         redirect_to('/admin');
     }
 
-    if ($path === '/admin/shipping') {
-        admin_shipping();
+    if ($path === '/admin/shipping' || $path === '/admin/shipping/export' || $path === '/admin/shipping/packing') {
+        admin_shipping($path);
     }
     if ($path === '/admin/coupons' || preg_match('#^/admin/coupons/\d+/revoke$#', $path)) {
         admin_coupons($path);

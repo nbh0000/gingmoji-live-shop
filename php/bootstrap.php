@@ -66,6 +66,7 @@ function default_settings(): array
         'bank_holder' => '김민정(김모지)',
         'card_hold_minutes' => 10,
         'bank_auto_cancel_hours' => 24,
+        'last_courier' => 'CJ대한통운',
         'free_shipping_threshold' => 80000,
         'shipping_fee' => 4000,
         'show_stock' => false,

@@ -753,3 +753,5 @@ body.has-cartbar main.wrap { max-width: 820px; }
 .my-coupon strong { display: block; }
 .my-coupon .meta { font-size: 12px; color: var(--muted); }
 .my-coupon b { color: var(--pink-dd); font-size: 18px; white-space: nowrap; }
+.order-ship-info { margin: 10px 0; padding: 12px 14px; border-radius: var(--r-md); background: var(--pink-ll); font-size: 14px; }
+.order-ship-info a { color: var(--pink-dd); font-weight: 800; }
