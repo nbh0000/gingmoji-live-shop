@@ -139,12 +139,8 @@ function revoke_keep_coupon_if_needed(PDO $pdo, int $userId, string $cycle, arra
 function release_due_keep_orders(?int $onlyUserId = null, bool $force = false): int
 {
     $pdo = db();
-    // 예전 방식(7일 킵)으로 보관 중이던 주문은 결제일 기준 출고일을 채운다.
-    $missing = $pdo->query("SELECT id,paid_at,created_at FROM orders WHERE status='kept' AND keep_cycle IS NULL")->fetchAll();
-    foreach ($missing as $row) {
-        $pdo->prepare('UPDATE orders SET keep_cycle=? WHERE id=?')->execute([keep_cycle_for(strtotime((string)($row['paid_at'] ?: $row['created_at']))), (int)$row['id']]);
-    }
-    $sql = "SELECT * FROM orders WHERE status='kept' AND shipment_request_id IS NULL" . ($force ? '' : ' AND keep_cycle<=CURDATE()') . ($onlyUserId ? ' AND user_id=' . (int)$onlyUserId : '') . ' ORDER BY user_id, paid_at, id';
+    // 정책 변경 전(7일 킵)에 보관된 주문은 keep_cycle이 없다. 자동 전환하지 않고 관리자가 '지금 출고 전환'으로 보낸다.
+    $sql = "SELECT * FROM orders WHERE status='kept' AND shipment_request_id IS NULL" . ($force ? '' : ' AND keep_cycle IS NOT NULL AND keep_cycle<=CURDATE()') . ($onlyUserId ? ' AND user_id=' . (int)$onlyUserId : '') . ' ORDER BY user_id, paid_at, id';
     $due = $pdo->query($sql)->fetchAll();
     if (!$due) return 0;
     $byUser = [];
@@ -257,12 +253,12 @@ function admin_shipping(): never
 
     // 킵 보관 현황
     $nextCycle = keep_cycle_for();
-    $kept = $pdo->query("SELECT o.user_id, u.login_id, u.name AS user_name, u.youtube_nickname, MIN(o.keep_cycle) AS keep_cycle, COUNT(*) AS cnt, SUM(o.items_amount) AS items, SUM(o.shipping_fee) AS fee FROM orders o JOIN users u ON u.id=o.user_id WHERE o.status='kept' AND o.shipment_request_id IS NULL GROUP BY o.user_id, u.login_id, u.name, u.youtube_nickname ORDER BY keep_cycle, items DESC")->fetchAll();
+    $kept = $pdo->query("SELECT o.user_id, u.login_id, u.name AS user_name, u.youtube_nickname, IF(SUM(o.keep_cycle IS NULL)>0, NULL, MIN(o.keep_cycle)) AS keep_cycle, COUNT(*) AS cnt, SUM(o.items_amount) AS items, SUM(o.shipping_fee) AS fee FROM orders o JOIN users u ON u.id=o.user_id WHERE o.status='kept' AND o.shipment_request_id IS NULL GROUP BY o.user_id, u.login_id, u.name, u.youtube_nickname ORDER BY keep_cycle IS NOT NULL, keep_cycle, items DESC")->fetchAll();
     $keptRows = '';
     $keptTotal = 0;
     foreach ($kept as $row) {
         $keptTotal += (int)$row['items'];
-        $keptRows .= '<tr><td><strong>' . e($row['user_name'] ?: $row['login_id']) . '</strong><span class="table-sub">' . e($row['youtube_nickname'] ?: '-') . '</span></td><td>' . e(short_date((string)$row['keep_cycle'])) . '</td><td class="num">' . num($row['cnt']) . '건</td><td class="amount">' . won($row['items']) . '</td><td>' . ((int)$row['fee'] > 0 ? won($row['fee']) : '없음') . '</td><td><form method="post" action="/admin/shipping" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="release"><input type="hidden" name="user_id" value="' . (int)$row['user_id'] . '"><button class="btn sm ghost" data-confirm-dialog="' . e(($row['user_name'] ?: $row['login_id']) . '님의 킵 상품을 정기 출고일 전에 발송 대기로 바꿀까요?') . '">지금 출고 전환</button></form></td></tr>';
+        $keptRows .= '<tr><td><strong>' . e($row['user_name'] ?: $row['login_id']) . '</strong><span class="table-sub">' . e($row['youtube_nickname'] ?: '-') . '</span></td><td>' . ($row['keep_cycle'] ? e(short_date((string)$row['keep_cycle'])) : '<span class="chip pending">기존 킵 · 직접 출고</span>') . '</td><td class="num">' . num($row['cnt']) . '건</td><td class="amount">' . won($row['items']) . '</td><td>' . ((int)$row['fee'] > 0 ? won($row['fee']) : '없음') . '</td><td><form method="post" action="/admin/shipping" class="table-action"><input type="hidden" name="_csrf" value="' . e(csrf_token()) . '"><input type="hidden" name="action" value="release"><input type="hidden" name="user_id" value="' . (int)$row['user_id'] . '"><button class="btn sm ghost" data-confirm-dialog="' . e(($row['user_name'] ?: $row['login_id']) . '님의 킵 상품을 정기 출고일 전에 발송 대기로 바꿀까요?') . '">지금 출고 전환</button></form></td></tr>';
     }
     $keptTable = '<section class="card"><div class="card-heading"><div><h2>킵 보관 현황</h2><p>다음 정기 출고일은 <strong>' . e(short_date($nextCycle)) . '</strong>입니다. 출고일 0시가 지나면 고객별로 묶여 위 목록의 발송 대기로 자동 전환됩니다.</p></div></div><div class="table-wrap"><table class="orders-table"><thead><tr><th>고객</th><th>출고일</th><th>주문</th><th>킵 금액</th><th>낸 배송비</th><th>처리</th></tr></thead><tbody>' . ($keptRows ?: '<tr><td colspan="6" class="empty-cell">보관 중인 킵 상품이 없습니다.</td></tr>') . '</tbody></table></div></section>';
 
