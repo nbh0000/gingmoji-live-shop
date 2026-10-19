@@ -6,6 +6,7 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var placeBtn = $('[data-place-order]');
   var quote = null, busy = false;
+  var couponChoice = null; // null = 서버가 가장 큰 쿠폰 자동 선택
 
   function delivery() { return ($('input[name="delivery"]:checked') || {}).value || 'direct'; }
   function payment() { return ($('input[name="payment"]:checked') || {}).value || ''; }
@@ -60,7 +61,8 @@
     var sm = q && q.summary;
     $('[data-sum-items]').textContent = sm ? S.won(sm.itemsAmount) : '-';
     var mo = sm && sm.mergeOrder;
-    $('[data-sum-ship]').textContent = sm ? (sm.deliveryType === 'keep' ? '킵 (지금 무료)' : (mo ? '무료 (합배송)' : (sm.shippingFee ? S.won(sm.shippingFee) : '무료'))) : '-';
+    $('[data-sum-ship]').textContent = sm ? (sm.deliveryType === 'keep' ? (sm.shippingFee ? S.won(sm.shippingFee) + ' (첫 킵 결제)' : (sm.keepFeeReason === 'paid' ? '무료 (이번 출고분 결제됨)' : '무료')) : (mo ? '무료 (합배송)' : (sm.shippingFee ? S.won(sm.shippingFee) : '무료'))) : '-';
+    renderCoupons(sm);
     var pr = $('[data-sum-point-row]');
     if (pr) { pr.hidden = !(sm && sm.pointUsed); $('[data-sum-point]').textContent = sm ? '-' + sm.pointUsed.toLocaleString('ko-KR') + 'P' : ''; }
     $('[data-sum-total]').textContent = sm ? S.won(sm.total) : '-';
@@ -73,13 +75,27 @@
       hint.innerHTML = (sm.includeKept && sm.keptAmount ? '킵 ' + S.won(sm.keptAmount) + '을 합산해도 ' : '') + '<b style="color:var(--pink-dd)">' + S.won(sm.remainingForFree) + '</b> 더 담으면 무료배송이에요';
     } else if (sm && sm.deliveryType === 'keep') {
       hint.hidden = false;
-      hint.textContent = '킵 상품은 배송비 없이 보관되며, 다음 주문에서 같이 배송받을 수 있어요.';
+      hint.textContent = '킵 상품은 ' + (sm.keepCycleLabel || '정기 출고일') + '에 함께 출고돼요. ' + (sm.keepFeeReason === 'first' ? '이번 출고분 첫 킵 결제라 배송비가 붙고, 출고 전까지 추가 킵은 배송비가 없어요.' : '이번 출고분 배송비는 이미 결제돼서 추가 배송비가 없어요.');
     } else hint.hidden = true;
     var ph = $('[data-point-hint]');
     if (ph && q) ph.textContent = sm && sm.maxPoints ? '이번 주문에서 최대 ' + sm.maxPoints.toLocaleString('ko-KR') + 'P 사용할 수 있어요' : '사용 조건을 충족하지 않아요';
     var pi = $('[data-point-input]');
     if (pi && sm && pointUse() > sm.pointUsed) pi.value = sm.pointUsed || '';
     syncButton();
+  }
+
+  function renderCoupons(sm) {
+    var row = $('[data-coupon-row]');
+    if (!row) return;
+    var list = (sm && sm.coupons) || [];
+    row.hidden = !list.length;
+    if (!list.length) return;
+    var sel = $('[data-coupon-select]', row);
+    sel.innerHTML = '<option value="0">사용 안 함</option>' + list.map(function (c) {
+      return '<option value="' + c.id + '">' + S.esc(c.name) + ' ' + S.won(c.amount) + '</option>';
+    }).join('');
+    sel.value = String(sm.couponId || 0);
+    $('[data-sum-coupon]', row).textContent = sm.couponDiscount ? '-' + S.won(sm.couponDiscount) : '';
   }
 
   function syncKeepMerge() {
@@ -146,7 +162,7 @@
     var cart = S.load();
     if (!cart.length) { quote = { lines: [] }; renderLines(quote); renderSummary(null); return; }
     var wantedMerge = mergeOrderId();
-    S.api('POST', '/api/cart/quote', { lines: S.toLines(cart), deliveryType: delivery(), includeKept: includeKept(), mergeOrderId: wantedMerge, pointUse: pointUse() })
+    S.api('POST', '/api/cart/quote', { lines: S.toLines(cart), deliveryType: delivery(), includeKept: includeKept(), mergeOrderId: wantedMerge, pointUse: pointUse(), couponId: couponChoice })
       .then(function (q) {
         if (wantedMerge && !(q.summary && q.summary.mergeOrder)) {
           S.toast('선택한 주문이 더 이상 발송 대기 상태가 아니에요', 'error');
@@ -178,6 +194,8 @@
       syncButton();
     });
   });
+  var couponSelect = $('[data-coupon-select]');
+  if (couponSelect) couponSelect.addEventListener('change', function () { couponChoice = parseInt(couponSelect.value, 10) || 0; refresh(); });
   $$('input[name="cashReceiptType"]').forEach(function (r) { r.addEventListener('change', syncCashReceipt); });
   syncCashReceipt();
   var pi = $('[data-point-input]');
@@ -218,6 +236,7 @@
       mergeOrderId: mergeOrderId(),
       paymentMethod: payment(),
       pointUse: pointUse(),
+      couponId: couponChoice,
       depositorName: val('depositorName'),
       cashReceipt: cashReceipt(),
       saveAddress: ($('[name="saveAddress"]') || {}).checked || false,

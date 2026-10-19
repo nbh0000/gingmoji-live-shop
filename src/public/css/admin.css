@@ -357,3 +357,28 @@ tr.dragging td { background: var(--pink-ll); }
 .login-card .logo { color: var(--ink); text-align: center; font-size: 34px; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition-duration: 1ms !important; } }
+
+/* 배송 관리 */
+.ship-day { margin-bottom: 16px; }
+.ship-day h2 { margin: 0 0 10px; font-size: 17px; }
+.ship-day-late { box-shadow: inset 4px 0 0 var(--warn), var(--shadow); }
+.ship-day-late h2 { color: var(--warn); }
+.ship-day-today { box-shadow: inset 4px 0 0 var(--pink-d), var(--shadow); }
+.ship-table .ship-check { width: 34px; text-align: center; }
+.ship-table .ship-seq { width: 44px; font-weight: 800; font-size: 16px; }
+.ship-table .member-cell strong { display: block; margin-top: 2px; }
+.ship-items { max-width: 320px; font-size: 13px; line-height: 1.5; }
+.ship-rules ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.stat.soft { background: var(--pink-l); }
+/* 쿠폰 관리 */
+.coupon-issue { margin-bottom: 16px; }
+.coupon-issue h2 { margin: 0 0 12px; font-size: 17px; }
+.coupon-user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; max-height: 260px; overflow-y: auto; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.coupon-user { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.coupon-user[hidden] { display: none; }
+.chip.coupon-active { background: var(--ok-l); color: var(--ok); }
+.chip.coupon-used { background: var(--night); color: var(--cream); }
+.chip.coupon-scheduled { background: var(--warn-l); color: var(--warn); }
+.chip.coupon-expired, .chip.coupon-revoked { background: #f1eceb; color: #a89a9c; }
+.coupon-user input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; accent-color: var(--pink-d); }
+.coupon-user { padding: 5px 2px; }

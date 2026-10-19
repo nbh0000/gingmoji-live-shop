@@ -574,4 +574,39 @@
   renderBadge();
 
   window.GMShop = { api: api, toast: toast, load: load, save: save, toLines: toLines, won: won, esc: esc, lineQty: lineQty, openSheet: openSheet, closeSheet: closeSheet, refreshQuote: refreshQuote, OPT: OPT };
+
+  // ===== 배송 안내 공지 모달 =====
+  (function () {
+    var modal = $('[data-notice-modal]');
+    if (!modal) return;
+    var today = new Date();
+    var todayKey = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
+    var store = function (area, key, value) {
+      try { if (value === undefined) return window[area].getItem(key); window[area].setItem(key, value); } catch (e) { return null; }
+    };
+    if (store('localStorage', 'gm_notice_hide') === todayKey || store('sessionStorage', 'gm_notice_seen') === '1') return;
+    var lastFocus = null;
+    function close(hideToday) {
+      store('sessionStorage', 'gm_notice_seen', '1');
+      if (hideToday) store('localStorage', 'gm_notice_hide', todayKey);
+      modal.classList.remove('open');
+      document.documentElement.style.overflow = '';
+      document.removeEventListener('keydown', onKey);
+      setTimeout(function () { modal.hidden = true; }, 240);
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+    function onKey(e) { if (e.key === 'Escape') close(false); }
+    $$('[data-src]', modal).forEach(function (img) { img.src = img.getAttribute('data-src'); });
+    $$('[data-srcset]', modal).forEach(function (src) { src.srcset = src.getAttribute('data-srcset'); });
+    lastFocus = document.activeElement;
+    modal.hidden = false;
+    document.documentElement.style.overflow = 'hidden';
+    requestAnimationFrame(function () { modal.classList.add('open'); });
+    var closeBtn = $('[data-notice-close]', modal);
+    closeBtn.addEventListener('click', function () { close(false); });
+    $('[data-notice-today]', modal).addEventListener('click', function () { close(true); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) close(false); });
+    document.addEventListener('keydown', onKey);
+    closeBtn.focus({ preventScroll: true });
+  })();
 })();
